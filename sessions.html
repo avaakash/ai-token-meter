@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>All Sessions — Claude Usage Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  (function () {
+    var saved = localStorage.getItem("claude-usage-theme");
+    var theme = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #0f1115; --card: #171a21; --card-alt: #1b1f28; --border: #262b36;
+    --text: #e6e8ec; --muted: #8b93a3; --accent: #d97757; --accent-text: #1a0f0a;
+    --accent2: #6ea8fe; --green: #4ade80; --red: #f87171; --shadow: rgba(0,0,0,0.45);
+    color-scheme: dark;
+  }
+  html[data-theme="light"] {
+    --bg: #f5f6f8; --card: #ffffff; --card-alt: #f3f4f7; --border: #e2e4e9;
+    --text: #1a1d24; --muted: #656d7c; --accent: #c1602f; --accent-text: #ffffff;
+    --accent2: #2563eb; --green: #16a34a; --red: #dc2626; --shadow: rgba(20,20,30,0.16);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.45; padding: 40px 24px 72px;
+  }
+  .wrap { max-width: 100%; margin: 0 auto; }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 22px; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .back-link { color: var(--accent2); text-decoration: none; font-size: 13px; }
+  .back-link:hover { text-decoration: underline; }
+  .theme-toggle {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: 8px; margin-top: 2px;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    cursor: pointer; padding: 0;
+  }
+  .theme-toggle:hover { border-color: var(--accent2); }
+  .theme-toggle .icon-moon { display: none; }
+  html[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+  html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
+
+  section { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px 24px 20px; }
+
+  .summary-bar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 18px; }
+  @media (max-width: 900px) { .summary-bar { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 560px) { .summary-bar { grid-template-columns: repeat(2, 1fr); } }
+  .summary-tile { background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .summary-label { color: var(--muted); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: 4px; }
+  .summary-value { font-size: 18px; font-weight: 700; letter-spacing: -.01em; }
+  .summary-value.accent { color: var(--accent); }
+
+  .controls-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+  .controls-row input, .controls-row select {
+    background: var(--card-alt); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 13.5px; padding: 9px 12px; font-family: inherit;
+  }
+  .controls-row input:focus, .controls-row select:focus { outline: none; border-color: var(--accent2); }
+  #search-input { flex: 1; min-width: 200px; }
+  .result-count { color: var(--muted); font-size: 12.5px; margin-left: auto; white-space: nowrap; }
+
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 10px; white-space: nowrap; }
+  thead th {
+    color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .04em; border-bottom: 1px solid var(--border); padding-bottom: 10px;
+    cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .sort-arrow { margin-left: 4px; opacity: .5; }
+  thead th.sorted .sort-arrow { opacity: 1; color: var(--accent2); }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(odd) { background: var(--card-alt); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .cost { color: var(--accent); font-weight: 650; }
+  .tname { font-weight: 550; overflow: hidden; text-overflow: ellipsis; max-width: 320px; white-space: nowrap; }
+  .tsub { color: var(--muted); font-size: 11px; margin-top: 2px; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+  .tsub-num { color: var(--muted); font-size: 10.5px; margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .sid-cell { font-family: monospace; font-size: 12px; color: var(--muted); }
+  .copy-btn {
+    background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--muted);
+    font-size: 11px; line-height: 1; padding: 3px 6px; cursor: pointer; margin-left: 6px; vertical-align: middle;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent2); }
+  .empty { color: var(--muted); font-size: 13px; padding: 14px 0; }
+
+  .dash-tooltip {
+    position: fixed; z-index: 1000; left: 0; top: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--text);
+    pointer-events: none; box-shadow: 0 6px 20px var(--shadow);
+    white-space: nowrap; opacity: 0; visibility: hidden;
+    transform: translate(-50%, calc(-100% - 12px));
+    transition: opacity .08s ease;
+  }
+  .dash-tooltip.visible { opacity: 1; visibility: visible; }
+  .dash-tooltip .tt-title { font-weight: 650; margin-bottom: 3px; }
+  .dash-tooltip .tt-row { color: var(--muted); }
+  .dash-tooltip .tt-row b { color: var(--text); font-weight: 650; }
+  @media (max-width: 700px) { table { font-size: 12.5px; } th, td { padding: 8px 6px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header-row">
+    <div>
+      <h1>All Sessions</h1>
+      <div class="sub"><a class="back-link" href="/">&larr; Back to dashboard</a></div>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+
+  <section>
+    <div class="summary-bar" id="summary-bar">
+      <div class="summary-tile">
+        <div class="summary-label">Sessions</div>
+        <div class="summary-value" id="sum-sessions">–</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-label">Total cost</div>
+        <div class="summary-value accent" id="sum-cost">–</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-label">Total tokens</div>
+        <div class="summary-value" id="sum-tokens">–</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-label">Total messages</div>
+        <div class="summary-value" id="sum-messages">–</div>
+      </div>
+      <div class="summary-tile">
+        <div class="summary-label">Total time</div>
+        <div class="summary-value" id="sum-time">–</div>
+      </div>
+    </div>
+    <div class="controls-row">
+      <input type="text" id="search-input" placeholder="Search name, path, project, or session ID…" autocomplete="off" spellcheck="false">
+      <select id="project-filter"><option value="">All projects</option></select>
+      <span class="result-count" id="result-count">–</span>
+    </div>
+    <div class="table-scroll">
+      <table id="sessions-table">
+        <thead>
+          <tr>
+            <th data-key="title">Name<span class="sort-arrow">▾</span></th>
+            <th data-key="session_id">Session ID<span class="sort-arrow">▾</span></th>
+            <th class="num" data-key="message_count">Msgs<span class="sort-arrow">▾</span></th>
+            <th class="num" data-key="tokens">Tokens<span class="sort-arrow">▾</span></th>
+            <th class="num" data-key="cache">Cache<span class="sort-arrow">▾</span></th>
+            <th class="num" data-key="cost">Cost<span class="sort-arrow">▾</span></th>
+            <th data-key="models">Models<span class="sort-arrow">▾</span></th>
+            <th data-key="start_ts">Started<span class="sort-arrow">▾</span></th>
+            <th data-key="end_ts">Ended<span class="sort-arrow">▾</span></th>
+          </tr>
+        </thead>
+        <tbody><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function fmtNum(n) {
+  n = Number(n) || 0;
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+}
+function fmtCost(n) {
+  n = Number(n) || 0;
+  return "$" + n.toFixed(2);
+}
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return MONTH_NAMES[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear() + " " +
+    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+}
+
+const tooltipEl = document.createElement("div");
+tooltipEl.className = "dash-tooltip";
+document.body.appendChild(tooltipEl);
+function positionTooltip(evt) {
+  tooltipEl.style.left = evt.clientX + "px";
+  tooltipEl.style.top = evt.clientY + "px";
+}
+function attachTooltip(el, htmlFn) {
+  if (!el) return;
+  el.addEventListener("mouseenter", (e) => {
+    tooltipEl.innerHTML = typeof htmlFn === "function" ? htmlFn() : htmlFn;
+    positionTooltip(e);
+    tooltipEl.classList.add("visible");
+  });
+  el.addEventListener("mousemove", positionTooltip);
+  el.addEventListener("mouseleave", () => tooltipEl.classList.remove("visible"));
+}
+
+function wireCopyButtons(root) {
+  root.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute("data-session-id");
+      try {
+        await navigator.clipboard.writeText(id);
+        const prev = btn.textContent;
+        btn.textContent = "✓";
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+      } catch (err) {
+        // Clipboard API unavailable — ignore silently.
+      }
+    });
+  });
+}
+
+let allSessions = [];
+let sortKey = "end_ts";
+let sortDir = -1; // -1 desc, 1 asc
+
+function displayTitleFor(r) {
+  return r.title || r.project || "unknown";
+}
+
+function computeRowFields(r) {
+  r.tokens = (r.input_tokens || 0) + (r.output_tokens || 0);
+  r.cache = (r.cache_read_tokens || 0) + (r.cache_write_tokens || 0);
+  r.models_clean = (r.models || "").split(",").filter(m => m && m !== "<synthetic>").join(", ");
+  return r;
+}
+
+function applySortFilter() {
+  const q = document.getElementById("search-input").value.trim().toLowerCase();
+  const project = document.getElementById("project-filter").value;
+
+  let rows = allSessions;
+  if (project) rows = rows.filter(r => r.project === project);
+  if (q) {
+    rows = rows.filter(r => {
+      const hay = [displayTitleFor(r), r.project, r.cwd, r.session_id, r.models_clean]
+        .filter(Boolean).join(" ").toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  rows = rows.slice().sort((a, b) => {
+    let av, bv;
+    if (sortKey === "title") { av = displayTitleFor(a).toLowerCase(); bv = displayTitleFor(b).toLowerCase(); }
+    else if (sortKey === "models") { av = a.models_clean.toLowerCase(); bv = b.models_clean.toLowerCase(); }
+    else if (sortKey === "start_ts" || sortKey === "end_ts") { av = new Date(a[sortKey] || 0).getTime(); bv = new Date(b[sortKey] || 0).getTime(); }
+    else if (sortKey === "session_id") { av = a.session_id || ""; bv = b.session_id || ""; }
+    else { av = Number(a[sortKey]) || 0; bv = Number(b[sortKey]) || 0; }
+
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return 0;
+  });
+
+  renderTable(rows);
+  renderSummary(rows);
+  document.getElementById("result-count").textContent = rows.length + " of " + allSessions.length + " sessions";
+}
+
+function fmtDurationMs(ms) {
+  const totalMinutes = Math.round(ms / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  const parts = [];
+  if (days) parts.push(days + "d");
+  if (hours) parts.push(hours + "h");
+  if (!days && minutes) parts.push(minutes + "m");
+  return parts.length ? parts.join(" ") : "0m";
+}
+
+function renderSummary(rows) {
+  let totalCost = 0, totalTokens = 0, totalMessages = 0, totalMs = 0;
+  for (const r of rows) {
+    totalCost += r.cost || 0;
+    totalTokens += (r.input_tokens || 0) + (r.output_tokens || 0) + (r.cache_read_tokens || 0) + (r.cache_write_tokens || 0);
+    totalMessages += r.message_count || 0;
+    if (r.start_ts && r.end_ts) {
+      const span = new Date(r.end_ts).getTime() - new Date(r.start_ts).getTime();
+      if (span > 0) totalMs += span;
+    }
+  }
+  document.getElementById("sum-sessions").textContent = fmtNum(rows.length);
+  document.getElementById("sum-cost").textContent = fmtCost(totalCost);
+  document.getElementById("sum-tokens").textContent = fmtNum(totalTokens);
+  document.getElementById("sum-messages").textContent = fmtNum(totalMessages);
+  document.getElementById("sum-time").textContent = fmtDurationMs(totalMs);
+}
+
+function renderTable(rows) {
+  const tbody = document.querySelector("#sessions-table tbody");
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="empty">No sessions match.</td></tr>';
+    return;
+  }
+  for (const r of rows) {
+    const displayTitle = displayTitleFor(r);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>
+        <div class="tname" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
+        ${r.cwd ? `<div class="tsub" title="${escapeHtml(r.cwd)}">${escapeHtml(r.cwd)}</div>` : ""}
+      </td>
+      <td class="sid-cell">${escapeHtml((r.session_id || "").slice(0, 12))}<button class="copy-btn" data-session-id="${escapeHtml(r.session_id)}" title="Copy full session ID">⧉</button></td>
+      <td class="num">${fmtNum(r.message_count)}</td>
+      <td class="num tokens-cell">
+        <div>${fmtNum(r.tokens)}</div>
+        <div class="tsub-num">${fmtNum(r.input_tokens)} in · ${fmtNum(r.output_tokens)} out</div>
+      </td>
+      <td class="num cache-cell">
+        <div>${fmtNum(r.cache)}</div>
+        <div class="tsub-num">${fmtNum(r.cache_read_tokens)} read · ${fmtNum(r.cache_write_tokens)} write</div>
+      </td>
+      <td class="num cost">${fmtCost(r.cost)}</td>
+      <td>${escapeHtml(r.models_clean)}</td>
+      <td>${escapeHtml(fmtDate(r.start_ts))}</td>
+      <td>${escapeHtml(fmtDate(r.end_ts))}</td>
+    `;
+    tbody.appendChild(tr);
+    attachTooltip(tr.querySelector(".tname"), () => `
+      <div class="tt-title">${escapeHtml(displayTitle)}</div>
+      <div class="tt-row">Session: <b>${escapeHtml(r.session_id || "")}</b></div>
+      <div class="tt-row">Project: <b>${escapeHtml(r.project || "")}</b></div>
+      ${r.cwd ? `<div class="tt-row">Path: <b>${escapeHtml(r.cwd)}</b></div>` : ""}
+    `);
+  }
+  wireCopyButtons(tbody);
+}
+
+function populateProjectFilter() {
+  const select = document.getElementById("project-filter");
+  const projects = Array.from(new Set(allSessions.map(r => r.project).filter(Boolean))).sort();
+  for (const p of projects) {
+    const opt = document.createElement("option");
+    opt.value = p;
+    opt.textContent = p;
+    select.appendChild(opt);
+  }
+}
+
+document.querySelectorAll("#sessions-table thead th").forEach(th => {
+  th.addEventListener("click", () => {
+    const key = th.getAttribute("data-key");
+    if (sortKey === key) {
+      sortDir *= -1;
+    } else {
+      sortKey = key;
+      sortDir = -1;
+    }
+    document.querySelectorAll("#sessions-table thead th").forEach(t => t.classList.remove("sorted"));
+    th.classList.add("sorted");
+    th.querySelector(".sort-arrow").textContent = sortDir === -1 ? "▾" : "▴";
+    applySortFilter();
+  });
+});
+
+document.getElementById("search-input").addEventListener("input", applySortFilter);
+document.getElementById("project-filter").addEventListener("change", applySortFilter);
+
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  const html = document.documentElement;
+  const next = html.getAttribute("data-theme") === "light" ? "dark" : "light";
+  html.setAttribute("data-theme", next);
+  localStorage.setItem("claude-usage-theme", next);
+});
+
+async function load() {
+  try {
+    const res = await fetch("/api/all-sessions", { cache: "no-store" });
+    const data = await res.json();
+    allSessions = (data.sessions || []).map(computeRowFields);
+    populateProjectFilter();
+    applySortFilter();
+  } catch (e) {
+    document.querySelector("#sessions-table tbody").innerHTML =
+      '<tr><td colspan="9" class="empty">Could not reach dashboard server: ' + escapeHtml(String(e)) + '</td></tr>';
+  }
+}
+load();
+</script>
+</body>
+</html>

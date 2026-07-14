@@ -1,0 +1,66 @@
+{
+  "last_verified": "2026-07-02",
+  "source": "Anthropic API pricing (platform.claude.com/docs/en/pricing), via the claude-api skill",
+  "models": {
+    "claude-fable-5": [
+      {"from": null, "input": 10.00, "output": 50.00}
+    ],
+    "claude-mythos-5": [
+      {"from": null, "input": 10.00, "output": 50.00}
+    ],
+    "claude-mythos-preview": [
+      {"from": null, "input": 10.00, "output": 50.00}
+    ],
+    "claude-opus-4-8": [
+      {"from": null, "input": 5.00, "output": 25.00}
+    ],
+    "claude-opus-4-7": [
+      {"from": null, "input": 5.00, "output": 25.00}
+    ],
+    "claude-opus-4-6": [
+      {"from": null, "input": 5.00, "output": 25.00}
+    ],
+    "claude-opus-4-5": [
+      {"from": null, "input": 5.00, "output": 25.00}
+    ],
+    "claude-opus-4-1": [
+      {"from": null, "input": 15.00, "output": 75.00}
+    ],
+    "claude-opus-4-0": [
+      {"from": null, "input": 15.00, "output": 75.00}
+    ],
+    "claude-sonnet-5": [
+      {"from": null, "input": 2.00, "output": 10.00},
+      {"from": "2026-09-01", "input": 3.00, "output": 15.00}
+    ],
+    "claude-sonnet-4-6": [
+      {"from": null, "input": 3.00, "output": 15.00}
+    ],
+    "claude-sonnet-4-5": [
+      {"from": null, "input": 3.00, "output": 15.00}
+    ],
+    "claude-sonnet-4-0": [
+      {"from": null, "input": 3.00, "output": 15.00}
+    ],
+    "claude-haiku-4-5": [
+      {"from": null, "input": 1.00, "output": 5.00}
+    ],
+    "claude-3-5-haiku": [
+      {"from": null, "input": 0.80, "output": 4.00}
+    ],
+    "claude-3-haiku": [
+      {"from": null, "input": 0.25, "output": 1.25}
+    ],
+    "claude-3-opus": [
+      {"from": null, "input": 15.00, "output": 75.00}
+    ]
+  },
+  "prefix_fallback": [
+    ["claude-fable", {"input": 10.00, "output": 50.00}],
+    ["claude-mythos", {"input": 10.00, "output": 50.00}],
+    ["claude-opus", {"input": 5.00, "output": 25.00}],
+    ["claude-sonnet", {"input": 3.00, "output": 15.00}],
+    ["claude-haiku", {"input": 1.00, "output": 5.00}]
+  ],
+  "unknown_default": {"input": 3.00, "output": 15.00}
+}

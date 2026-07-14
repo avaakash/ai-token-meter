@@ -1,0 +1,1540 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Claude Token Usage Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script>
+  // Runs before CSS is applied to avoid a flash of the wrong theme.
+  (function () {
+    var saved = localStorage.getItem("claude-usage-theme");
+    var theme = saved || (window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    document.documentElement.setAttribute("data-theme", theme);
+  })();
+</script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --card: #171a21;
+    --card-alt: #1b1f28;
+    --border: #262b36;
+    --text: #e6e8ec;
+    --muted: #8b93a3;
+    --accent: #d97757;
+    --accent-text: #1a0f0a;
+    --accent2: #6ea8fe;
+    --green: #4ade80;
+    --red: #f87171;
+    --purple: #a78bfa;
+    --cell-0: #1c2029;
+    --cell-1: #3a2a22;
+    --cell-2: #6e4531;
+    --cell-3: #a75c3b;
+    --cell-outline: rgba(255,255,255,0.06);
+    --shadow: rgba(0,0,0,0.45);
+    color-scheme: dark;
+  }
+  html[data-theme="light"] {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --card-alt: #f3f4f7;
+    --border: #e2e4e9;
+    --text: #1a1d24;
+    --muted: #656d7c;
+    --accent: #c1602f;
+    --accent-text: #ffffff;
+    --accent2: #2563eb;
+    --green: #16a34a;
+    --red: #dc2626;
+    --purple: #7c3aed;
+    --cell-0: #e9ebef;
+    --cell-1: #f3d9c5;
+    --cell-2: #e7ab7c;
+    --cell-3: #d3854f;
+    --cell-outline: rgba(0,0,0,0.06);
+    --shadow: rgba(20,20,30,0.16);
+    color-scheme: light;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.45;
+    padding: 40px 24px 72px;
+  }
+  .wrap { max-width: 100%; margin: 0 auto; }
+
+  /* ---------- Header ---------- */
+  header { margin-bottom: 32px; }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+  h1 { font-size: 22px; font-weight: 650; margin: 0 0 6px; letter-spacing: -.01em; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .sub #status-dot { display:inline-block; width:7px; height:7px; border-radius:50%; background: var(--green); margin-right:7px; vertical-align:1px; }
+  .nav-link { color: var(--accent2); text-decoration: none; }
+  .nav-link:hover { text-decoration: underline; }
+
+  .theme-toggle {
+    display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    width: 34px; height: 34px; border-radius: 8px; margin-top: 2px;
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    cursor: pointer; padding: 0;
+  }
+  .theme-toggle:hover { border-color: var(--accent2); }
+  .theme-toggle .icon-moon { display: none; }
+  html[data-theme="light"] .theme-toggle .icon-sun { display: none; }
+  html[data-theme="light"] .theme-toggle .icon-moon { display: block; }
+
+  /* ---------- Stat cards ---------- */
+  .grid-top {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+  @media (max-width: 900px) { .grid-top { grid-template-columns: repeat(2, 1fr); } }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .stat-card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; font-weight: 600; }
+  .stat-card .value { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+  .stat-card .value.accent { color: var(--accent); }
+  .stat-card .hint { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+  /* ---------- Sections & rows ---------- */
+  section {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px 24px 20px;
+    margin-bottom: 22px;
+  }
+  .row { display: grid; gap: 16px; margin-bottom: 22px; }
+  .row > section { margin-bottom: 0; min-width: 0; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  @media (max-width: 800px) { .row-2 { grid-template-columns: 1fr; } }
+  .row-3to2 { grid-template-columns: 3fr 2fr; }
+  @media (max-width: 800px) { .row-3to2 { grid-template-columns: 1fr; } }
+
+
+  .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .section-head h2 { font-size: 15px; font-weight: 650; margin: 0; color: var(--text); }
+  .section-head .desc { font-size: 12.5px; color: var(--muted); }
+
+  /* ---------- Mini stat tiles (Efficiency & Highlights) ---------- */
+  .mini-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .mini-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .mini-grid { grid-template-columns: 1fr; } }
+  .mini-tile { background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .mini-tile .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: 6px; }
+  .mini-tile .value { font-size: 19px; font-weight: 700; letter-spacing: -.01em; }
+  .mini-tile .value.accent { color: var(--accent); }
+  .mini-tile .sub { color: var(--muted); font-size: 11.5px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Rate limit windows ---------- */
+  .limit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 700px) { .limit-grid { grid-template-columns: 1fr; } }
+  .limit-card { background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .limit-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .limit-card-head .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+  .limit-card-head .value { font-size: 23px; font-weight: 700; letter-spacing: -.01em; }
+  .limit-card .sub { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+  .mini-chart { margin-top: 14px; }
+  .mini-bars { display: flex; align-items: flex-end; gap: 4px; height: 56px; }
+  .mini-bar-col-stack {
+    flex: 1; min-width: 0; display: flex; flex-direction: column-reverse;
+    border-radius: 3px 3px 0 0; overflow: hidden; min-height: 2px;
+  }
+  .mini-bar-labels { display: flex; gap: 4px; margin-top: 4px; }
+  .mini-bar-label { flex: 1; min-width: 0; text-align: center; font-size: 9.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .limit-breakdown { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 14px; }
+  .limit-breakdown-item { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+  .limit-breakdown-label { font-size: 11px; color: var(--muted); display: flex; align-items: center; }
+  .limit-breakdown-value { font-size: 14px; font-weight: 650; margin-top: 3px; }
+  .limit-breakdown-sub { font-size: 10.5px; color: var(--muted); }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; flex-shrink: 0; }
+
+  .limit-log { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .limit-log input {
+    flex: none; width: 75px; min-width: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 12.5px; padding: 12px 12px; font-family: inherit;
+  }
+  .limit-log input:focus { outline: none; border-color: var(--accent2); }
+  .sync-btn {
+    flex: none; background: var(--card-alt); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 14px; font-size: 12.5px; font-weight: 600; cursor: pointer;
+  }
+  .sync-btn:hover { border-color: var(--accent2); }
+  .sync-btn:disabled { opacity: .6; cursor: default; }
+
+  .api-info-panel {
+    background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-bottom: 16px; font-size: 12.5px; color: var(--muted);
+  }
+  .api-info-panel p { margin: 8px 0; }
+  .api-info-panel ol { margin: 6px 0; padding-left: 20px; }
+  .api-info-panel li { margin: 3px 0; }
+  .api-info-panel code {
+    background: var(--card); border: 1px solid var(--border); border-radius: 4px;
+    padding: 1px 6px; font-size: 11.5px; color: var(--text);
+  }
+  .api-info-panel a { color: var(--accent2); }
+  .api-info-status { font-weight: 650; margin-bottom: 4px; }
+  .api-info-status.ok { color: var(--green); }
+  .api-info-status.error { color: var(--red); }
+  .limit-log button {
+    flex: none; background: var(--accent); color: var(--accent-text); border: none; border-radius: 8px;
+    padding: 10px 14px; font-size: 12.5px; font-weight: 650; cursor: pointer;
+  }
+  .limit-log button:hover { filter: brightness(1.08); }
+  .limit-log-list {
+    flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto;
+    font-size: 10.5px; color: var(--muted);
+  }
+  .limit-log-row {
+    flex-shrink: 0; white-space: nowrap; background: var(--card); border: 1px solid var(--border);
+    border-radius: 6px; padding: 4px 8px;
+  }
+  .limit-log-row b { color: var(--text); }
+  .limit-log-empty { padding: 4px 0; }
+
+  /* ---------- Search ---------- */
+  .search-row { display: flex; gap: 10px; }
+  .search-row input {
+    flex: 1; background: var(--card-alt); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-size: 13.5px; padding: 10px 12px; font-family: inherit;
+  }
+  .search-row input:focus { outline: none; border-color: var(--accent2); }
+  .search-row button {
+    background: var(--accent); color: var(--accent-text); border: none; border-radius: 8px;
+    padding: 0 20px; font-size: 13.5px; font-weight: 650; cursor: pointer;
+  }
+  .search-row button:hover { filter: brightness(1.08); }
+  #session-search-results { margin-top: 16px; }
+  .session-detail + .session-detail { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border); }
+  .session-detail-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+  .session-detail-head .cost { font-size: 22px; }
+
+  /* ---------- Tables ---------- */
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; padding: 10px 10px; white-space: nowrap; }
+  thead th {
+    color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .04em; border-bottom: 1px solid var(--border); padding-bottom: 10px;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:nth-child(odd) { background: var(--card-alt); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .cost { color: var(--accent); font-weight: 650; }
+  .rank { color: var(--muted); width: 40px; font-variant-numeric: tabular-nums; font-size: 12px; }
+  .tname { font-weight: 550; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .tsub { color: var(--muted); font-size: 11.5px; margin-top: 1px; white-space: normal; }
+  .tsub-num { color: var(--muted); font-size: 10.5px; margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tsub-path {
+    color: var(--muted); font-size: 10.5px; margin-top: 2px; font-family: monospace;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px;
+  }
+  .table-scroll { overflow-x: auto; }
+  @media (max-width: 700px) { table { font-size: 12.5px; } th, td { padding: 8px 6px; } }
+
+  .copy-btn {
+    background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--muted);
+    font-size: 11px; line-height: 1; padding: 3px 6px; cursor: pointer; margin-left: 6px; vertical-align: middle;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--accent2); }
+
+  /* ---------- Vertical bar chart (Last 15 days) ---------- */
+  .chart-scroll { overflow-x: auto; }
+  .chart { display: flex; height: 220px; min-width: 560px; }
+  .chart-yaxis { position: relative; width: 54px; flex-shrink: 0; }
+  .chart-yaxis-label {
+    position: absolute; right: 8px; transform: translateY(50%);
+    font-size: 11px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums;
+  }
+  .chart-plot {
+    flex: 1; position: relative;
+    border-left: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  }
+  .chart-gridlines { position: absolute; inset: 0; }
+  .chart-gridline { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); }
+  .chart-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; gap: 8px; padding: 0 8px; }
+  .chart-col { flex: 1; height: 100%; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .chart-bar-value { font-size: 10.5px; color: var(--text); margin-bottom: 5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .chart-bar-stack {
+    width: 65%; display: flex; flex-direction: column-reverse;
+    border-radius: 4px 4px 0 0; overflow: hidden; min-height: 2px;
+  }
+  .chart-bar-seg { width: 100%; flex-shrink: 0; flex-basis: 0; }
+  .seg-input { background: var(--accent2); }
+  .seg-output { background: var(--accent); }
+  .seg-cache-read { background: var(--green); }
+  .seg-cache-write { background: var(--purple); }
+  .chart-xlabels { display: flex; margin-top: 8px; min-width: 560px; }
+  .chart-yaxis-spacer { width: 55px; flex-shrink: 0; }
+  .chart-xlabels-row { flex: 1; display: flex; gap: 8px; padding: 0 8px; }
+  .chart-xlabel { flex: 1; min-width: 0; text-align: center; font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chart-legend { display: flex; gap: 18px; justify-content: center; flex-wrap: wrap; margin-top: 16px; font-size: 11.5px; color: var(--muted); }
+  .chart-legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+
+  /* ---------- Shared heat-scale colors (day heatmap + hour/weekday grid) ---------- */
+  .cell-0 { background: var(--cell-0); }
+  .cell-1 { background: var(--cell-1); }
+  .cell-2 { background: var(--cell-2); }
+  .cell-3 { background: var(--cell-3); }
+  .cell-4 { background: var(--accent); }
+
+  /* ---------- Heatmap (fills its card — cells stretch via flex:1) ---------- */
+  .heatmap-scroll { overflow-x: auto; padding-bottom: 4px; }
+  .heatmap-inner { display: flex; flex-direction: column; gap: 4px; width: 100%; }
+  .heatmap-months { display: flex; gap: 3px; padding-left: 31px; }
+  .heatmap-month-label { flex: 1; min-width: 0; font-size: 10px; color: var(--muted); }
+  .heatmap-body { display: flex; gap: 3px; }
+  .heatmap-daylabels { display: flex; flex-direction: column; gap: 3px; width: 28px; flex-shrink: 0; justify-content: space-between; }
+  .heatmap-daylabels span { font-size: 9px; color: var(--muted); }
+  .heatmap-weeks { display: flex; gap: 3px; flex: 1; min-width: 0; }
+  .heatmap-week { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+  .heatmap-day {
+    width: 100%; aspect-ratio: 1; border-radius: 2px;
+    outline: 1px solid var(--cell-outline); outline-offset: -1px;
+  }
+  .heatmap-day.out-of-range { opacity: 0; pointer-events: none; }
+  .heatmap-legend { display: flex; align-items: center; gap: 5px; justify-content: center; margin-top: 14px; color: var(--muted); font-size: 11px; }
+  .heatmap-legend .heatmap-day { width: 11px; height: 11px; aspect-ratio: unset; }
+
+  /* ---------- Hour x weekday grid (fills its card — cells stretch via flex:1) ---------- */
+  .hw-scroll { overflow-x: auto; }
+  .hw-grid { display: flex; flex-direction: column; gap: 3px; width: 100%; }
+  .hw-row { display: flex; gap: 3px; align-items: center; }
+  .hw-label { width: 30px; flex-shrink: 0; font-size: 11px; color: var(--muted); }
+  .hw-hourlabel { flex: 1; min-width: 0; text-align: center; font-size: 9px; color: var(--muted); }
+  .hw-cell { flex: 1; min-width: 0; aspect-ratio: 1; border-radius: 2px; outline: 1px solid var(--cell-outline); outline-offset: -1px; }
+
+  /* ---------- Shared hover tooltip ---------- */
+  .dash-tooltip {
+    position: fixed; z-index: 1000; left: 0; top: 0;
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 11px; font-size: 12px; line-height: 1.5; color: var(--text);
+    pointer-events: none; box-shadow: 0 6px 20px var(--shadow);
+    white-space: nowrap; opacity: 0; visibility: hidden;
+    transform: translate(-50%, calc(-100% - 12px));
+    transition: opacity .08s ease;
+  }
+  .dash-tooltip.visible { opacity: 1; visibility: visible; }
+  .dash-tooltip .tt-title { font-weight: 650; margin-bottom: 3px; }
+  .dash-tooltip .tt-row { color: var(--muted); }
+  .dash-tooltip .tt-row b { color: var(--text); font-weight: 650; }
+  .dash-tooltip .tt-row .cost { color: var(--accent); }
+
+  /* ---------- Misc ---------- */
+  .empty { color: var(--muted); font-size: 13px; padding: 14px 0; }
+  footer { color: var(--muted); font-size: 11.5px; text-align: center; margin-top: 28px; }
+  #pricing-note.stale { color: var(--red); font-weight: 600; }
+  code { background: var(--card-alt); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="header-row">
+    <div>
+      <h1>Claude Token Usage &amp; Estimated Cost</h1>
+      <div class="sub"><span id="status-dot"></span><span id="status-text">Loading…</span> · <a class="nav-link" href="/sessions.html">All sessions &rarr;</a></div>
+    </div>
+    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+      <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </header>
+
+  <div class="grid-top">
+    <div class="stat-card">
+      <div class="label">Total est. cost</div>
+      <div class="value accent" id="total-cost">–</div>
+      <div class="hint">across all logged sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Today's cost</div>
+      <div class="value" id="today-cost">–</div>
+      <div class="hint" id="today-tokens">–</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total tokens</div>
+      <div class="value" id="total-tokens">–</div>
+      <div class="hint" id="total-tokens-breakdown">–</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Messages logged</div>
+      <div class="value" id="total-messages">–</div>
+      <div class="hint">assistant turns, deduped</div>
+    </div>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <h2>Rate limit windows</h2>
+      <span class="desc" id="remote-sync-status">Spend within your current 5-hour and weekly windows</span>
+      <button id="api-info-btn" class="sync-btn" title="About Claude API sync">Claude API ⓘ</button>
+      <button id="sync-now-btn" class="sync-btn">Sync now</button>
+    </div>
+    <div class="api-info-panel" id="api-info-panel" hidden>
+      <div class="api-info-status" id="api-info-status">–</div>
+      <p>This dashboard reads your real usage percentage and reset times directly from Anthropic, authenticated using the OAuth token Claude Code already stores in your macOS Keychain — no separate login or API key needed.</p>
+      <p><b>To enable it:</b></p>
+      <ol>
+        <li>Install the <a href="https://docs.claude.com/en/docs/claude-code/overview" target="_blank" rel="noopener">Claude Code CLI</a></li>
+        <li>Run <code>claude auth login</code> (or just use Claude Code normally once — that's enough to store the token)</li>
+        <li>Click "Sync now" above, or wait up to 10 minutes for the next automatic sync</li>
+      </ol>
+      <p>Without this, the dashboard falls back to a local estimate for window boundaries and skips the "Claude-reported" percentage line on each card.</p>
+    </div>
+    <div class="limit-grid">
+      <div class="limit-card">
+        <div class="limit-card-head">
+          <div class="label">5-hour window</div>
+          <div class="value accent" id="fivehour-cost">–</div>
+        </div>
+        <div class="sub" id="fivehour-tokens">–</div>
+        <div class="sub" id="fivehour-range">–</div>
+        <div class="sub" id="fivehour-remote">–</div>
+        <div class="sub" id="fivehour-prev">–</div>
+
+        <div class="mini-chart">
+          <div class="mini-bars" id="fivehour-bars"></div>
+          <div class="mini-bar-labels" id="fivehour-bar-labels"></div>
+        </div>
+
+        <div class="limit-breakdown" id="fivehour-breakdown"></div>
+
+        <div class="sub" id="fivehour-estimate">–</div>
+        <div class="limit-log">
+          <div class="limit-log-list" id="fivehour-log-list"></div>
+        </div>
+      </div>
+
+      <div class="limit-card">
+        <div class="limit-card-head">
+          <div class="label">Weekly window</div>
+          <div class="value accent" id="weekly-cost">–</div>
+        </div>
+        <div class="sub" id="weekly-tokens">–</div>
+        <div class="sub" id="weekly-range">–</div>
+        <div class="sub" id="weekly-remote">–</div>
+        <div class="sub" id="weekly-prev">–</div>
+
+        <div class="mini-chart">
+          <div class="mini-bars" id="weekly-bars"></div>
+          <div class="mini-bar-labels" id="weekly-bar-labels"></div>
+        </div>
+
+        <div class="limit-breakdown" id="weekly-breakdown"></div>
+
+        <div class="sub" id="weekly-estimate">–</div>
+        <div class="limit-log">
+          <div class="limit-log-list" id="weekly-log-list"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Efficiency &amp; highlights</h2>
+      <span class="desc">Caching impact and notable extremes</span>
+    </div>
+    <div class="mini-grid">
+      <div class="mini-tile">
+        <div class="label">Cache hit rate</div>
+        <div class="value accent" id="cache-hit-rate">–</div>
+        <div class="sub" id="cache-hit-sub">–</div>
+      </div>
+      <div class="mini-tile">
+        <div class="label">Est. saved by caching</div>
+        <div class="value" id="cache-savings">–</div>
+        <div class="sub" id="cache-savings-sub">–</div>
+      </div>
+      <div class="mini-tile">
+        <div class="label">Avg cost / message</div>
+        <div class="value" id="avg-cost-message">–</div>
+        <div class="sub">across all messages</div>
+      </div>
+      <div class="mini-tile">
+        <div class="label">Avg cost / session</div>
+        <div class="value" id="avg-cost-session">–</div>
+        <div class="sub" id="avg-cost-session-sub">–</div>
+      </div>
+      <div class="mini-tile">
+        <div class="label">Most expensive day</div>
+        <div class="value" id="top-day-cost">–</div>
+        <div class="sub" id="top-day-date">–</div>
+      </div>
+      <div class="mini-tile">
+        <div class="label">Longest session</div>
+        <div class="value" id="longest-session-duration">–</div>
+        <div class="sub" id="longest-session-sub">–</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>Look up a session</h2>
+      <span class="desc">Paste a full or partial session ID</span>
+    </div>
+    <div class="search-row">
+      <input type="text" id="session-search-input" placeholder="e.g. c6e9df07-2107-4ddb-9d84-84d9e53dfc6f or just c6e9df07" autocomplete="off" spellcheck="false">
+      <button id="session-search-btn">Search</button>
+    </div>
+    <div id="session-search-results"></div>
+  </section>
+
+  <div class="row row-3to2">
+    <section>
+      <div class="section-head">
+        <h2>Activity — past 9 months</h2>
+        <span class="desc">Darker = more spend</span>
+      </div>
+      <div class="heatmap-scroll">
+        <div class="heatmap-inner">
+          <div class="heatmap-months" id="heatmap-months"></div>
+          <div class="heatmap-body">
+            <div class="heatmap-daylabels"><span>Mon</span><span></span><span>Wed</span><span></span><span>Fri</span><span></span><span></span></div>
+            <div class="heatmap-weeks" id="heatmap-weeks"></div>
+          </div>
+        </div>
+      </div>
+      <div class="heatmap-legend">
+        <span>Less</span>
+        <div class="heatmap-day cell-0"></div>
+        <div class="heatmap-day cell-1"></div>
+        <div class="heatmap-day cell-2"></div>
+        <div class="heatmap-day cell-3"></div>
+        <div class="heatmap-day cell-4"></div>
+        <span>More</span>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Activity by time of day</h2>
+        <span class="desc">Local time · darker = more spend</span>
+      </div>
+      <div class="hw-scroll">
+        <div class="hw-grid" id="hw-grid"></div>
+      </div>
+    </section>
+  </div>
+
+  <section>
+    <div class="section-head">
+      <h2>Last 15 days</h2>
+      <span class="desc">Daily cost by token type</span>
+    </div>
+    <div class="chart-scroll">
+      <div class="chart" id="day-chart">
+        <div class="chart-yaxis" id="day-chart-yaxis"></div>
+        <div class="chart-plot" id="day-chart-plot">
+          <div class="chart-gridlines" id="day-chart-gridlines"></div>
+          <div class="chart-bars" id="day-chart-bars"></div>
+        </div>
+      </div>
+      <div class="chart-xlabels" id="day-chart-xlabels">
+        <div class="chart-yaxis-spacer"></div>
+        <div class="chart-xlabels-row" id="day-chart-xlabels-row"></div>
+      </div>
+    </div>
+    <div class="chart-legend">
+      <span><i class="swatch" style="background:var(--accent2)"></i>Input</span>
+      <span><i class="swatch" style="background:var(--accent)"></i>Output</span>
+      <span><i class="swatch" style="background:var(--green)"></i>Cache read</span>
+      <span><i class="swatch" style="background:var(--purple)"></i>Cache write</span>
+    </div>
+  </section>
+
+  <div class="row row-2">
+    <section>
+      <div class="section-head">
+        <h2>Top 10 sessions</h2>
+        <span class="desc">By cost</span>
+      </div>
+      <div class="table-scroll">
+      <table id="top-session-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Session</th>
+            <th class="num">Tokens</th>
+            <th class="num">Cache</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>Last 10 sessions</h2>
+        <span class="desc">By recency</span>
+      </div>
+      <div class="table-scroll">
+      <table id="recent-session-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th>Session</th>
+            <th class="num">Tokens</th>
+            <th class="num">Cache</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <div class="row row-2">
+    <section>
+      <div class="section-head">
+        <h2>By model</h2>
+      </div>
+      <div class="table-scroll">
+      <table id="model-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th class="num">Tokens</th>
+            <th class="num">Cache</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h2>By project</h2>
+      </div>
+      <div class="table-scroll">
+      <table id="project-table">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th class="num">Msgs</th>
+            <th class="num">Tokens</th>
+            <th class="num">Cache</th>
+            <th class="num">Cost</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </section>
+  </div>
+
+  <footer>
+    Reads local Claude Code session logs only (<code>~/.claude/projects</code>). Refreshes every 60s.
+    Costs are estimates based on published Anthropic API pricing.
+    <span id="pricing-note"></span>
+  </footer>
+</div>
+
+<script>
+const REFRESH_MS = 60000;
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WEEKDAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+
+/* ---------- Shared hover tooltip ---------- */
+const tooltipEl = document.createElement("div");
+tooltipEl.className = "dash-tooltip";
+document.body.appendChild(tooltipEl);
+
+function positionTooltip(evt) {
+  const pad = 12;
+  let x = evt.clientX;
+  let y = evt.clientY;
+  x = Math.min(Math.max(x, 60), window.innerWidth - 60);
+  y = Math.max(y, 40);
+  tooltipEl.style.left = x + "px";
+  tooltipEl.style.top = y + "px";
+}
+function attachTooltip(el, htmlFn) {
+  el.addEventListener("mouseenter", (e) => {
+    tooltipEl.innerHTML = typeof htmlFn === "function" ? htmlFn() : htmlFn;
+    positionTooltip(e);
+    tooltipEl.classList.add("visible");
+  });
+  el.addEventListener("mousemove", positionTooltip);
+  el.addEventListener("mouseleave", () => tooltipEl.classList.remove("visible"));
+}
+
+function fmtNum(n) {
+  n = Number(n) || 0;
+  if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+}
+function fmtCost(n) {
+  n = Number(n) || 0;
+  return "$" + n.toFixed(2);
+}
+function fmtCostPrecise(n) {
+  n = Number(n) || 0;
+  return "$" + n.toFixed(4);
+}
+function fmtCostShort(n) {
+  n = Number(n) || 0;
+  if (n >= 100) return "$" + Math.round(n);
+  if (n >= 1) return "$" + n.toFixed(1);
+  return "$" + n.toFixed(2);
+}
+function niceCeil(max) {
+  if (max <= 0) return 10;
+  const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
+  const residual = max / magnitude;
+  let niceResidual;
+  if (residual <= 1) niceResidual = 1;
+  else if (residual <= 2) niceResidual = 2;
+  else if (residual <= 5) niceResidual = 5;
+  else niceResidual = 10;
+  return niceResidual * magnitude;
+}
+function fmtDateShort(d) {
+  return MONTH_NAMES[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear();
+}
+function localDateKey(d) {
+  // "YYYY-MM-DD" in the browser's local timezone — NOT toISOString(), which
+  // is UTC and would shift the date for any non-zero UTC offset (the server
+  // buckets "day" in local time too, so this must match).
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+function fmtDayLabel(dayStr) {
+  // "YYYY-MM-DD" -> "Jul 1"
+  const [y, m, day] = dayStr.split("-").map(Number);
+  return MONTH_NAMES[m - 1] + " " + day;
+}
+function fmtDayFull(dayStr) {
+  // "YYYY-MM-DD" -> "Jul 1, 2026"
+  const [y, m, day] = dayStr.split("-").map(Number);
+  return MONTH_NAMES[m - 1] + " " + day + ", " + y;
+}
+function fmtDuration(seconds) {
+  seconds = Number(seconds) || 0;
+  if (seconds >= 86400) return (seconds / 86400).toFixed(1) + "d";
+  if (seconds >= 3600) return (seconds / 3600).toFixed(1) + "h";
+  return Math.max(1, Math.round(seconds / 60)) + "m";
+}
+function fmtIST(isoStr) {
+  const d = new Date(isoStr);
+  return d.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit",
+  }) + " IST";
+}
+function fmtISTFull(isoStr) {
+  const d = new Date(isoStr);
+  return d.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata", weekday: "short", month: "short", day: "numeric",
+    hour: "numeric", minute: "2-digit",
+  }) + " IST";
+}
+
+const LIMIT_TOKEN_TYPES = [
+  ["input", "Input", "input_tokens", "cost_input"],
+  ["output", "Output", "output_tokens", "cost_output"],
+  ["cache-read", "Cache read", "cache_read_tokens", "cost_cache_read"],
+  ["cache-write", "Cache write", "cache_write_tokens", "cost_cache_write"],
+];
+
+function renderLimitBreakdown(prefix, data) {
+  const el = document.getElementById(prefix + "-breakdown");
+  el.innerHTML = LIMIT_TOKEN_TYPES.map(([cls, label, tokKey, costKey]) => `
+    <div class="limit-breakdown-item">
+      <div class="limit-breakdown-label"><span class="swatch seg-${cls}"></span>${label}</div>
+      <div class="limit-breakdown-value">${fmtCost(data[costKey] || 0)}</div>
+      <div class="limit-breakdown-sub">${fmtNum(data[tokKey] || 0)} tok</div>
+    </div>
+  `).join("");
+}
+
+function renderMiniBars(barsId, labelsId, buckets, labelFn) {
+  const barsEl = document.getElementById(barsId);
+  const labelsEl = document.getElementById(labelsId);
+  barsEl.innerHTML = "";
+  labelsEl.innerHTML = "";
+  if (!buckets || !buckets.length) return;
+
+  const totals = buckets.map(b =>
+    (b.cost_input || 0) + (b.cost_output || 0) + (b.cost_cache_read || 0) + (b.cost_cache_write || 0)
+  );
+  const max = Math.max(...totals, 0.0001);
+
+  buckets.forEach((b, i) => {
+    const total = totals[i];
+    const stack = document.createElement("div");
+    stack.className = "mini-bar-col-stack";
+    stack.style.height = Math.max(total > 0 ? 4 : 1, (total / max) * 100) + "%";
+    LIMIT_TOKEN_TYPES.forEach(([cls, , , costKey]) => {
+      const seg = document.createElement("div");
+      seg.className = "chart-bar-seg seg-" + cls;
+      seg.style.flexGrow = String(Math.max(b[costKey] || 0, 0));
+      stack.appendChild(seg);
+    });
+    barsEl.appendChild(stack);
+
+    attachTooltip(stack, () => `
+      <div class="tt-title">${escapeHtml(labelFn(b, i))}</div>
+      <div class="tt-row">Cost: <b class="cost">${fmtCost(total)}</b></div>
+      <div class="tt-row">Input: <b>${fmtCost(b.cost_input || 0)}</b></div>
+      <div class="tt-row">Output: <b>${fmtCost(b.cost_output || 0)}</b></div>
+      <div class="tt-row">Cache read: <b>${fmtCost(b.cost_cache_read || 0)}</b></div>
+      <div class="tt-row">Cache write: <b>${fmtCost(b.cost_cache_write || 0)}</b></div>
+    `);
+
+    const label = document.createElement("div");
+    label.className = "mini-bar-label";
+    label.textContent = labelFn(b, i);
+    labelsEl.appendChild(label);
+  });
+}
+
+function fiveHourBucketLabel(b) {
+  return new Date(b.start).toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit",
+  });
+}
+function weeklyBucketLabel(b) {
+  return new Date(b.start).toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata", weekday: "short",
+  });
+}
+
+function renderPrevLine(elId, cost, previous, label) {
+  const el = document.getElementById(elId);
+  if (!previous) { el.textContent = ""; return; }
+  let diffText = "";
+  if (previous.cost > 0) {
+    const diffPct = ((cost - previous.cost) / previous.cost) * 100;
+    const sign = diffPct >= 0 ? "+" : "";
+    diffText = " (" + sign + diffPct.toFixed(0) + "% vs current)";
+  }
+  el.textContent = label + ": " + fmtCost(previous.cost) + diffText;
+}
+
+function renderRemoteLine(elId, window) {
+  const el = document.getElementById(elId);
+  if (window.source === "remote" && window.remote_pct != null) {
+    el.textContent = "Claude-reported: " + window.remote_pct + "% used";
+  } else {
+    el.textContent = "Claude-reported: unavailable — showing local estimate";
+  }
+}
+
+function renderSyncStatus(limits) {
+  const el = document.getElementById("remote-sync-status");
+  const infoEl = document.getElementById("api-info-status");
+  const status = limits.remote_status || {};
+
+  if (status.last_error) {
+    el.textContent = "Sync failed: " + status.last_error;
+    el.style.color = "var(--red)";
+    infoEl.textContent = "❌ Not connected — " + status.last_error;
+    infoEl.className = "api-info-status error";
+    return;
+  }
+  el.style.color = "";
+  if (limits.remote_polled_at) {
+    const mins = Math.max(0, Math.round((Date.now() - new Date(limits.remote_polled_at).getTime()) / 60000));
+    const agoText = mins < 1 ? "just now" : mins + "m ago";
+    el.textContent = "Synced with Claude " + agoText;
+    infoEl.textContent = "✅ Connected — last synced " + agoText;
+    infoEl.className = "api-info-status ok";
+  } else {
+    el.textContent = "Not yet synced with Claude — showing local estimate";
+    infoEl.textContent = "⏳ Not yet synced — showing local estimate until the first sync completes";
+    infoEl.className = "api-info-status";
+  }
+}
+
+function renderLimits(limits) {
+  if (!limits) return;
+  renderSyncStatus(limits);
+  const fh = limits.five_hour;
+  if (fh) {
+    document.getElementById("fivehour-cost").textContent = fmtCost(fh.cost);
+    document.getElementById("fivehour-tokens").textContent =
+      fmtNum((fh.input_tokens || 0) + (fh.output_tokens || 0)) + " tokens · " + fmtNum(fh.message_count) + " msgs";
+    document.getElementById("fivehour-range").textContent =
+      "Started " + fmtIST(fh.window_start) + " · ends " + fmtISTFull(fh.window_end) +
+      " (in " + fmtDuration(fh.seconds_remaining) + ")";
+    renderRemoteLine("fivehour-remote", fh);
+    renderPrevLine("fivehour-prev", fh.cost, fh.previous, "Prev 5hr");
+    renderMiniBars("fivehour-bars", "fivehour-bar-labels", fh.buckets, fiveHourBucketLabel);
+    renderLimitBreakdown("fivehour", fh);
+    renderCreditEstimate("fivehour-estimate", fh.credit_estimate);
+  }
+  const wk = limits.weekly;
+  if (wk) {
+    document.getElementById("weekly-cost").textContent = fmtCost(wk.cost);
+    document.getElementById("weekly-tokens").textContent =
+      fmtNum((wk.input_tokens || 0) + (wk.output_tokens || 0)) + " tokens · " + fmtNum(wk.message_count) + " msgs";
+    document.getElementById("weekly-range").textContent =
+      "Started " + fmtIST(wk.window_start) + " · ends " + fmtISTFull(wk.window_end) +
+      " (in " + fmtDuration(wk.seconds_remaining) + ")";
+    renderRemoteLine("weekly-remote", wk);
+    renderPrevLine("weekly-prev", wk.cost, wk.previous, "Prev 1w");
+    renderMiniBars("weekly-bars", "weekly-bar-labels", wk.buckets, weeklyBucketLabel);
+    renderLimitBreakdown("weekly", wk);
+    renderCreditEstimate("weekly-estimate", wk.credit_estimate);
+  }
+}
+
+function renderLimitLog(listId, snapshots) {
+  const el = document.getElementById(listId);
+  if (!snapshots || !snapshots.length) {
+    el.innerHTML = '<div class="limit-log-empty">No entries logged yet.</div>';
+    return;
+  }
+  el.innerHTML = snapshots.slice(0, 5).map(s => {
+    const when = new Date(s.created_at).toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    }) + " IST";
+    return `<div class="limit-log-row" title="${escapeHtml(when)}"><b>${s.percentage}%</b> · ${fmtCost(s.dollar_value)}</div>`;
+  }).join("");
+}
+
+let limitSnapshotCache = [];
+
+async function refreshLimitLogs() {
+  try {
+    const res = await fetch("/api/limit-snapshots", { cache: "no-store" });
+    const data = await res.json();
+    limitSnapshotCache = data.snapshots || [];
+    renderLimitLog("fivehour-log-list", limitSnapshotCache.filter(s => s.window_type === "five_hour"));
+    renderLimitLog("weekly-log-list", limitSnapshotCache.filter(s => s.window_type === "weekly"));
+  } catch (e) {
+    // Non-critical — leave existing lists as-is.
+  }
+}
+
+function renderCreditEstimate(elId, estimate) {
+  const el = document.getElementById(elId);
+  if (!estimate) { el.textContent = ""; return; }
+  if (!estimate.available) {
+    el.textContent = "Est. credits: collecting data — " + estimate.points + "/" + estimate.points_needed + " points";
+    return;
+  }
+  el.textContent = "Est. plan limit " + fmtCost(estimate.estimated_total_dollars) +
+    " · ~" + fmtCost(estimate.remaining_dollars) + " remaining (" + estimate.points + " pts)";
+}
+function timeAgo(d) {
+  const mins = Math.floor((Date.now() - d.getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return mins + "m ago";
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + "h ago";
+  return Math.floor(hrs / 24) + "d ago";
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+function level(value, max) {
+  if (!value || !max) return 0;
+  const frac = value / max;
+  if (frac > 0.75) return 4;
+  if (frac > 0.5) return 3;
+  if (frac > 0.2) return 2;
+  return 1;
+}
+function sessionLabel(r) {
+  const start = r.start_ts ? new Date(r.start_ts) : null;
+  const end = r.end_ts ? new Date(r.end_ts) : null;
+  const dateLabel = start ? fmtDateShort(start) + (end && end.toDateString() !== start.toDateString() ? " – " + fmtDateShort(end) : "") : "";
+  const models = (r.models || "").split(",").filter(m => m && m !== "<synthetic>").join(", ");
+  // Prefer the title Claude Code's own UI shows for this session
+  // (custom_title, else its auto-generated ai_title — see backend "title"
+  // field), falling back to the project/folder name when neither exists.
+  const displayTitle = r.title || r.project || "unknown";
+  const showProjectInSub = !!(r.title && r.project);
+  const path = r.cwd || "";
+  return { dateLabel, models, start, end, displayTitle, showProjectInSub, path };
+}
+
+function copyButtonHtml(sessionId) {
+  return `<button class="copy-btn" data-session-id="${escapeHtml(sessionId)}" title="Copy session ID">⧉</button>`;
+}
+
+function wireCopyButtons(root) {
+  root.querySelectorAll(".copy-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const id = btn.getAttribute("data-session-id");
+      try {
+        await navigator.clipboard.writeText(id);
+        const prev = btn.textContent;
+        btn.textContent = "✓";
+        setTimeout(() => { btn.textContent = prev; }, 1200);
+      } catch (err) {
+        // Clipboard API unavailable — silently ignore, button still shows the ID via title.
+      }
+    });
+  });
+}
+
+function tokensCellHtml(r) {
+  return `
+    <td class="num tokens-cell">
+      <div>${fmtNum(r.input_tokens + r.output_tokens)}</div>
+      <div class="tsub-num">${fmtNum(r.input_tokens)} in · ${fmtNum(r.output_tokens)} out</div>
+    </td>
+  `;
+}
+function cacheCellHtml(r) {
+  return `
+    <td class="num cache-cell">
+      <div>${fmtNum(r.cache_read_tokens + r.cache_write_tokens)}</div>
+      <div class="tsub-num">${fmtNum(r.cache_read_tokens)} read · ${fmtNum(r.cache_write_tokens)} write</div>
+    </td>
+  `;
+}
+function tokensTooltip(r, label) {
+  return () => `
+    <div class="tt-title">${escapeHtml(label)}</div>
+    <div class="tt-row">Input: <b>${fmtNum(r.input_tokens)}</b> <span class="cost">${fmtCost(r.cost_input)}</span></div>
+    <div class="tt-row">Output: <b>${fmtNum(r.output_tokens)}</b> <span class="cost">${fmtCost(r.cost_output)}</span></div>
+  `;
+}
+function cacheTooltip(r, label) {
+  return () => `
+    <div class="tt-title">${escapeHtml(label)}</div>
+    <div class="tt-row">Cache read: <b>${fmtNum(r.cache_read_tokens)}</b> <span class="cost">${fmtCost(r.cost_cache_read)}</span></div>
+    <div class="tt-row">Cache write: <b>${fmtNum(r.cache_write_tokens)}</b> <span class="cost">${fmtCost(r.cost_cache_write)}</span></div>
+  `;
+}
+
+function renderModelTable(rows) {
+  const tbody = document.querySelector("#model-table tbody");
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty">No usage recorded yet.</td></tr>';
+    return;
+  }
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="tname">${escapeHtml(r.model)}</td>
+      ${tokensCellHtml(r)}
+      ${cacheCellHtml(r)}
+      <td class="num cost">${fmtCost(r.cost)}</td>
+    `;
+    tbody.appendChild(tr);
+    attachTooltip(tr.querySelector(".tokens-cell"), tokensTooltip(r, r.model));
+    attachTooltip(tr.querySelector(".cache-cell"), cacheTooltip(r, r.model));
+  }
+}
+
+function renderProjectTable(rows) {
+  const tbody = document.querySelector("#project-table tbody");
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No usage recorded yet.</td></tr>';
+    return;
+  }
+  for (const r of rows) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="tname" title="${escapeHtml(r.project)}">${escapeHtml(r.project)}</td>
+      <td class="num">${r.message_count}</td>
+      ${tokensCellHtml(r)}
+      ${cacheCellHtml(r)}
+      <td class="num cost">${fmtCost(r.cost)}</td>
+    `;
+    tbody.appendChild(tr);
+    attachTooltip(tr.querySelector(".tokens-cell"), tokensTooltip(r, r.project));
+    attachTooltip(tr.querySelector(".cache-cell"), cacheTooltip(r, r.project));
+  }
+}
+
+function renderSessionTable(tableId, rows, mode) {
+  const tbody = document.querySelector(`#${tableId} tbody`);
+  tbody.innerHTML = "";
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">No sessions recorded yet.</td></tr>';
+    return;
+  }
+  rows.forEach((r, i) => {
+    const { dateLabel, models, end, displayTitle, showProjectInSub, path } = sessionLabel(r);
+    const firstCol = mode === "recency" && end ? timeAgo(end) : String(i + 1);
+    const subParts = [r.message_count + " msgs"];
+    if (dateLabel) subParts.push(dateLabel);
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="rank">${firstCol}</td>
+      <td>
+        <div class="tname tname-hover">${escapeHtml(displayTitle)}</div>
+        <div class="tsub">${subParts.filter(Boolean).map(escapeHtml).join(" · ")}</div>
+        ${path ? `<div class="tsub-path" title="${escapeHtml(path)}">${escapeHtml(path)}</div>` : ""}
+      </td>
+      ${tokensCellHtml(r)}
+      ${cacheCellHtml(r)}
+      <td class="num cost">${fmtCost(r.cost)}</td>
+    `;
+    tbody.appendChild(tr);
+
+    attachTooltip(tr.querySelector(".tname-hover"), () => `
+      <div class="tt-title">${escapeHtml(displayTitle)}</div>
+      <div class="tt-row">Session: <b>${escapeHtml((r.session_id || "").slice(0, 12))}</b></div>
+      ${showProjectInSub ? `<div class="tt-row">Project: <b>${escapeHtml(r.project)}</b></div>` : ""}
+      <div class="tt-row">Model: <b>${escapeHtml(models)}</b></div>
+      ${dateLabel ? `<div class="tt-row">When: <b>${escapeHtml(dateLabel)}</b></div>` : ""}
+    `);
+    attachTooltip(tr.querySelector(".tokens-cell"), tokensTooltip(r, displayTitle));
+    attachTooltip(tr.querySelector(".cache-cell"), cacheTooltip(r, displayTitle));
+  });
+}
+
+function renderDayChart(rows) {
+  const last15 = rows.slice(0, 15).slice().reverse(); // chronological, oldest -> newest
+  const barsEl = document.getElementById("day-chart-bars");
+  const yaxisEl = document.getElementById("day-chart-yaxis");
+  const gridEl = document.getElementById("day-chart-gridlines");
+  const labelsRow = document.getElementById("day-chart-xlabels-row");
+  barsEl.innerHTML = "";
+  yaxisEl.innerHTML = "";
+  gridEl.innerHTML = "";
+  labelsRow.innerHTML = "";
+
+  if (!last15.length) {
+    barsEl.innerHTML = '<div class="empty">No usage recorded yet.</div>';
+    return;
+  }
+
+  let cumTotal = 0;
+  const days = last15.map(r => {
+    const input = r.cost_input || 0;
+    const output = r.cost_output || 0;
+    const cacheRead = r.cost_cache_read || 0;
+    const cacheWrite = r.cost_cache_write || 0;
+    const dayTotal = input + output + cacheRead + cacheWrite;
+    cumTotal += dayTotal;
+    return { day: r.day, input, output, cacheRead, cacheWrite, dayTotal, cumulative: cumTotal };
+  });
+
+  const niceMax = niceCeil(Math.max(...days.map(d => d.dayTotal), 0) || 1);
+
+  [0, 0.25, 0.5, 0.75, 1].forEach(frac => {
+    const label = document.createElement("div");
+    label.className = "chart-yaxis-label";
+    label.style.bottom = (frac * 100) + "%";
+    label.textContent = fmtCost(niceMax * frac);
+    yaxisEl.appendChild(label);
+
+    if (frac > 0) {
+      const line = document.createElement("div");
+      line.className = "chart-gridline";
+      line.style.bottom = (frac * 100) + "%";
+      gridEl.appendChild(line);
+    }
+  });
+
+  for (const d of days) {
+    const heightPct = Math.max(1, (d.dayTotal / niceMax) * 100);
+    const col = document.createElement("div");
+    col.className = "chart-col";
+
+    const valueLabel = document.createElement("div");
+    valueLabel.className = "chart-bar-value";
+    valueLabel.textContent = d.dayTotal > 0 ? fmtCostShort(d.dayTotal) : "";
+    col.appendChild(valueLabel);
+
+    const stack = document.createElement("div");
+    stack.className = "chart-bar-stack";
+    stack.style.height = heightPct + "%";
+    // Bottom -> top: input, output, cache read, cache write.
+    [
+      ["seg-input", d.input],
+      ["seg-output", d.output],
+      ["seg-cache-read", d.cacheRead],
+      ["seg-cache-write", d.cacheWrite],
+    ].forEach(([cls, value]) => {
+      const seg = document.createElement("div");
+      seg.className = "chart-bar-seg " + cls;
+      seg.style.flexGrow = String(Math.max(value, 0));
+      stack.appendChild(seg);
+    });
+    col.appendChild(stack);
+
+    attachTooltip(stack, () => `
+      <div class="tt-title">${escapeHtml(fmtDayLabel(d.day))}</div>
+      <div class="tt-row">This day: <b class="cost">${fmtCost(d.dayTotal)}</b></div>
+      <div class="tt-row">Input: <b>${fmtCost(d.input)}</b></div>
+      <div class="tt-row">Output: <b>${fmtCost(d.output)}</b></div>
+      <div class="tt-row">Cache read: <b>${fmtCost(d.cacheRead)}</b></div>
+      <div class="tt-row">Cache write: <b>${fmtCost(d.cacheWrite)}</b></div>
+      <div class="tt-row" style="margin-top:4px;">Cumulative: <b>${fmtCost(d.cumulative)}</b></div>
+    `);
+
+    barsEl.appendChild(col);
+
+    const xlabel = document.createElement("div");
+    xlabel.className = "chart-xlabel";
+    xlabel.textContent = fmtDayLabel(d.day);
+    labelsRow.appendChild(xlabel);
+  }
+}
+
+function renderHeatmap(days) {
+  const byDay = new Map(days.map(d => [d.day, d]));
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const rangeStart = new Date(today);
+  rangeStart.setMonth(rangeStart.getMonth() - 9); // 9 months back
+
+  // Align grid start to Monday so week columns are Mon..Sun (matches day labels).
+  const startDow = (rangeStart.getDay() + 6) % 7; // 0=Mon..6=Sun
+  const gridStart = new Date(rangeStart);
+  gridStart.setDate(gridStart.getDate() - startDow);
+
+  const cells = [];
+  const d = new Date(gridStart);
+  while (d <= today) {
+    const key = localDateKey(d);
+    const rec = byDay.get(key);
+    cells.push({
+      date: new Date(d),
+      key,
+      cost: rec ? rec.cost : 0,
+      tokens: rec ? (rec.input_tokens + rec.output_tokens) : 0,
+      count: rec ? rec.message_count : 0,
+      inRange: d >= rangeStart,
+    });
+    d.setDate(d.getDate() + 1);
+  }
+  // pad final week to a full 7 days
+  while (cells.length % 7 !== 0) {
+    const last = cells[cells.length - 1].date;
+    const next = new Date(last);
+    next.setDate(next.getDate() + 1);
+    cells.push({ date: next, key: localDateKey(next), cost: 0, tokens: 0, count: 0, inRange: false });
+  }
+
+  const weeks = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+
+  const maxCost = Math.max(...cells.filter(c => c.inRange).map(c => c.cost), 0);
+
+  const weeksEl = document.getElementById("heatmap-weeks");
+  weeksEl.innerHTML = "";
+  for (const week of weeks) {
+    const col = document.createElement("div");
+    col.className = "heatmap-week";
+    for (const cell of week) {
+      const div = document.createElement("div");
+      const lvl = level(cell.cost, maxCost);
+      div.className = "heatmap-day cell-" + lvl + (cell.inRange ? "" : " out-of-range");
+      if (cell.inRange) {
+        attachTooltip(div, () => `
+          <div class="tt-title">${escapeHtml(fmtDateShort(cell.date))}</div>
+          <div class="tt-row">Cost: <b class="cost">${fmtCost(cell.cost)}</b></div>
+          <div class="tt-row">Tokens: <b>${fmtNum(cell.tokens)}</b></div>
+          <div class="tt-row">Messages: <b>${cell.count}</b></div>
+        `);
+      }
+      col.appendChild(div);
+    }
+    weeksEl.appendChild(col);
+  }
+
+  const monthsEl = document.getElementById("heatmap-months");
+  monthsEl.innerHTML = "";
+  let lastMonth = null;
+  for (const week of weeks) {
+    const firstInRange = week.find(c => c.inRange) || week[0];
+    const m = firstInRange.date.getMonth();
+    const label = document.createElement("div");
+    label.className = "heatmap-month-label";
+    if (m !== lastMonth) {
+      label.textContent = MONTH_NAMES[m];
+      lastMonth = m;
+    }
+    monthsEl.appendChild(label);
+  }
+}
+
+function renderHourWeekday(rows) {
+  const map = new Map(rows.map(r => [r.weekday + "-" + r.hour, r]));
+  const maxCost = Math.max(...rows.map(r => r.cost), 0);
+  const container = document.getElementById("hw-grid");
+  container.innerHTML = "";
+
+  const headerRow = document.createElement("div");
+  headerRow.className = "hw-row";
+  let headerHtml = '<div class="hw-label"></div>';
+  for (let h = 0; h < 24; h++) {
+    headerHtml += `<div class="hw-hourlabel">${h % 3 === 0 ? h : ""}</div>`;
+  }
+  headerRow.innerHTML = headerHtml;
+  container.appendChild(headerRow);
+
+  WEEKDAY_NAMES.forEach((wd, wIdx) => {
+    const row = document.createElement("div");
+    row.className = "hw-row";
+    const label = document.createElement("div");
+    label.className = "hw-label";
+    label.textContent = wd;
+    row.appendChild(label);
+
+    for (let h = 0; h < 24; h++) {
+      const rec = map.get(wIdx + "-" + h);
+      const cost = rec ? rec.cost : 0;
+      const lvl = level(cost, maxCost);
+      const cell = document.createElement("div");
+      cell.className = "hw-cell cell-" + lvl;
+      const hourLabel = h.toString().padStart(2, "0") + ":00";
+      attachTooltip(cell, () => rec ? `
+        <div class="tt-title">${escapeHtml(wd)} ${hourLabel}</div>
+        <div class="tt-row">Cost: <b class="cost">${fmtCost(cost)}</b></div>
+        <div class="tt-row">Tokens: <b>${fmtNum(rec.tokens)}</b></div>
+        <div class="tt-row">Messages: <b>${rec.message_count}</b></div>
+      ` : `
+        <div class="tt-title">${escapeHtml(wd)} ${hourLabel}</div>
+        <div class="tt-row">No activity</div>
+      `);
+      row.appendChild(cell);
+    }
+    container.appendChild(row);
+  });
+}
+
+function renderEfficiency(data) {
+  const t = data.totals;
+  const cacheableTokens = (t.input_tokens || 0) + (t.cache_read_tokens || 0) + (t.cache_write_tokens || 0);
+  const hitRate = cacheableTokens > 0 ? (t.cache_read_tokens / cacheableTokens) * 100 : 0;
+  document.getElementById("cache-hit-rate").textContent = hitRate.toFixed(1) + "%";
+  document.getElementById("cache-hit-sub").textContent =
+    fmtNum(t.cache_read_tokens) + " of " + fmtNum(cacheableTokens) + " prompt tokens";
+
+  const savings = Math.max(0, (t.cost_no_cache || 0) - (t.cost || 0));
+  document.getElementById("cache-savings").textContent = fmtCost(savings);
+  document.getElementById("cache-savings-sub").textContent =
+    "would've cost " + fmtCost(t.cost_no_cache || 0) + " uncached";
+
+  const avgMsg = t.message_count ? t.cost / t.message_count : 0;
+  document.getElementById("avg-cost-message").textContent = "$" + avgMsg.toFixed(3);
+
+  const avgSession = t.session_count ? t.cost / t.session_count : 0;
+  document.getElementById("avg-cost-session").textContent = fmtCost(avgSession);
+  document.getElementById("avg-cost-session-sub").textContent = (t.session_count || 0) + " sessions total";
+
+  if (data.top_day) {
+    document.getElementById("top-day-cost").textContent = fmtCost(data.top_day.cost);
+    document.getElementById("top-day-date").textContent = fmtDayFull(data.top_day.day);
+  } else {
+    document.getElementById("top-day-cost").textContent = "–";
+    document.getElementById("top-day-date").textContent = "no data yet";
+  }
+
+  const ls = data.longest_session;
+  if (ls) {
+    document.getElementById("longest-session-duration").textContent = fmtDuration(ls.duration_seconds);
+    document.getElementById("longest-session-sub").textContent =
+      escapeHtmlTruncate(ls.project) + " · " + fmtCost(ls.cost);
+  } else {
+    document.getElementById("longest-session-duration").textContent = "–";
+    document.getElementById("longest-session-sub").textContent = "no data yet";
+  }
+}
+function escapeHtmlTruncate(s) {
+  s = String(s || "unknown");
+  return s.length > 24 ? s.slice(0, 24) + "…" : s;
+}
+
+/* ---------- Session search ---------- */
+
+function buildSessionDetailCard(r) {
+  const { dateLabel, models, displayTitle, showProjectInSub, path } = sessionLabel(r);
+  const wrap = document.createElement("div");
+  wrap.className = "session-detail";
+
+  const subParts = [r.message_count + " msgs"];
+  if (showProjectInSub) subParts.push(r.project);
+  subParts.push(models);
+  if (dateLabel) subParts.push(dateLabel);
+
+  const head = document.createElement("div");
+  head.className = "session-detail-head";
+  head.innerHTML = `
+    <div>
+      <div class="tname">${escapeHtml(displayTitle)}</div>
+      <div class="tsub">${subParts.filter(Boolean).map(escapeHtml).join(" · ")}</div>
+      <div class="tsub">${escapeHtml(r.session_id)}${copyButtonHtml(r.session_id)}</div>
+      ${path ? `<div class="tsub-path" title="${escapeHtml(path)}">${escapeHtml(path)}</div>` : ""}
+    </div>
+    <div class="cost">${fmtCost(r.cost)}</div>
+  `;
+  wrap.appendChild(head);
+  wireCopyButtons(head);
+
+  const scrollWrap = document.createElement("div");
+  scrollWrap.className = "table-scroll";
+  const table = document.createElement("table");
+  table.innerHTML = `
+    <thead><tr>
+      <th>Model</th><th class="num">Input</th><th class="num">Output</th>
+      <th class="num">Cache read</th><th class="num">Cache write</th><th class="num">Cost</th>
+    </tr></thead>
+    <tbody></tbody>
+  `;
+  const tbody = table.querySelector("tbody");
+  for (const m of (r.by_model || [])) {
+    if (m.model === "<synthetic>") continue;
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(m.model)}</td>
+      <td class="num">${fmtNum(m.input_tokens)}</td>
+      <td class="num">${fmtNum(m.output_tokens)}</td>
+      <td class="num">${fmtNum(m.cache_read_tokens)}</td>
+      <td class="num">${fmtNum(m.cache_write_tokens)}</td>
+      <td class="num cost">${fmtCost(m.cost)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  scrollWrap.appendChild(table);
+  wrap.appendChild(scrollWrap);
+  return wrap;
+}
+
+async function runSessionSearch() {
+  const input = document.getElementById("session-search-input");
+  const resultsEl = document.getElementById("session-search-results");
+  const q = input.value.trim();
+  if (!q) { resultsEl.innerHTML = ""; return; }
+
+  resultsEl.innerHTML = '<div class="empty">Searching…</div>';
+  try {
+    const res = await fetch("/api/session?id=" + encodeURIComponent(q), { cache: "no-store" });
+    const data = await res.json();
+    resultsEl.innerHTML = "";
+    if (!data.results || !data.results.length) {
+      resultsEl.innerHTML = `<div class="empty">No session found matching "${escapeHtml(q)}".</div>`;
+      return;
+    }
+    for (const r of data.results) {
+      resultsEl.appendChild(buildSessionDetailCard(r));
+    }
+  } catch (e) {
+    resultsEl.innerHTML = '<div class="empty">Search failed — ' + escapeHtml(String(e)) + '</div>';
+  }
+}
+
+document.getElementById("session-search-btn").addEventListener("click", runSessionSearch);
+document.getElementById("session-search-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") runSessionSearch();
+});
+
+/* ---------- Main refresh loop ---------- */
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/usage", { cache: "no-store" });
+    const data = await res.json();
+
+    const pricingNoteEl = document.getElementById("pricing-note");
+    if (data.pricing_last_verified) {
+      const verified = new Date(data.pricing_last_verified + "T00:00:00Z");
+      const daysAgo = Math.floor((Date.now() - verified.getTime()) / 86400000);
+      const stale = daysAgo > 45;
+      pricingNoteEl.textContent = stale
+        ? ` Pricing last verified ${fmtDayFull(data.pricing_last_verified)} (${daysAgo}d ago) — may be outdated.`
+        : ` Pricing verified ${fmtDayFull(data.pricing_last_verified)}.`;
+      pricingNoteEl.classList.toggle("stale", stale);
+    }
+
+    document.getElementById("total-cost").textContent = fmtCost(data.totals.cost);
+    document.getElementById("today-cost").textContent = fmtCostPrecise(data.today.cost);
+    document.getElementById("today-tokens").textContent =
+      fmtNum((data.today.input_tokens || 0) + (data.today.output_tokens || 0)) + " tokens today";
+
+    const totalTokens = (data.totals.input_tokens || 0) + (data.totals.output_tokens || 0)
+      + (data.totals.cache_read_tokens || 0) + (data.totals.cache_write_tokens || 0);
+    document.getElementById("total-tokens").textContent = fmtNum(totalTokens);
+    document.getElementById("total-tokens-breakdown").textContent =
+      fmtNum(data.totals.input_tokens) + " in · " + fmtNum(data.totals.output_tokens) + " out · " +
+      fmtNum(data.totals.cache_read_tokens) + " cached";
+    document.getElementById("total-messages").textContent = fmtNum(data.totals.message_count);
+
+    renderLimits(data.limits);
+    refreshLimitLogs();
+    renderEfficiency(data);
+    renderModelTable(data.by_model);
+    renderSessionTable("top-session-table", data.top_sessions || [], "rank");
+    renderSessionTable("recent-session-table", data.last_sessions || [], "recency");
+    renderProjectTable(data.by_project);
+    renderDayChart(data.by_day);
+    renderHeatmap(data.heatmap_days || []);
+    renderHourWeekday(data.hour_weekday || []);
+
+    const t = new Date(data.generated_at);
+    document.getElementById("status-text").textContent =
+      "Live — last updated " + t.toLocaleTimeString();
+    document.getElementById("status-dot").style.background = "#4ade80";
+  } catch (e) {
+    document.getElementById("status-text").textContent = "Could not reach dashboard server: " + e;
+    document.getElementById("status-dot").style.background = "#f87171";
+  }
+}
+
+document.getElementById("theme-toggle").addEventListener("click", () => {
+  const html = document.documentElement;
+  const next = html.getAttribute("data-theme") === "light" ? "dark" : "light";
+  html.setAttribute("data-theme", next);
+  localStorage.setItem("claude-usage-theme", next);
+});
+
+document.getElementById("api-info-btn").addEventListener("click", () => {
+  const panel = document.getElementById("api-info-panel");
+  panel.hidden = !panel.hidden;
+});
+
+document.getElementById("sync-now-btn").addEventListener("click", async () => {
+  const btn = document.getElementById("sync-now-btn");
+  btn.disabled = true;
+  const prevLabel = btn.textContent;
+  btn.textContent = "Syncing…";
+  try {
+    const res = await fetch("/api/remote-usage/poll", { method: "POST" });
+    const data = await res.json();
+    if (!res.ok || data.error || data.ok === false) {
+      throw new Error(data.error || "sync failed");
+    }
+    await refresh();
+  } catch (e) {
+    document.getElementById("remote-sync-status").textContent = "Sync failed: " + e;
+    document.getElementById("remote-sync-status").style.color = "var(--red)";
+  } finally {
+    btn.textContent = prevLabel;
+    btn.disabled = false;
+  }
+});
+
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
