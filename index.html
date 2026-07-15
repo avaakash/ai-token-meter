@@ -241,6 +241,33 @@
   .limit-log-row b { color: var(--text); }
   .limit-log-empty { padding: 4px 0; }
 
+  /* ---------- Weekly daily-usage strip ---------- */
+  .limit-usage-cols { display: flex; gap: 16px; margin-top: 14px; }
+  .limit-usage-cols > div { flex: 1; min-width: 0; }
+  @media (max-width: 480px) { .limit-usage-cols { flex-direction: column; gap: 10px; } }
+  .limit-daily-max-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: 6px; }
+  .limit-daily-max-empty { color: var(--muted); font-size: 11.5px; }
+
+  /* ---------- Numbers-only % chips (weekly overview + daily usage) ---------- */
+  .pct-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pct-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    background: var(--card-alt); border: 1px solid var(--border); border-radius: 8px;
+    padding: 5px 9px; min-width: 42px;
+  }
+  .pct-chip-label { font-size: 10px; color: var(--muted); }
+  .pct-chip-value { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .pct-chip.pct-chip-empty .pct-chip-value { color: var(--muted); font-weight: 500; }
+
+  /* ---------- Quota alarms ---------- */
+  .alarm-banner {
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(248,113,113,0.12); border: 1px solid var(--red);
+    border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: var(--text);
+  }
+  .alarm-banner .alarm-icon { font-size: 16px; flex-shrink: 0; }
+
+
   /* ---------- Search ---------- */
   .search-row { display: flex; gap: 10px; }
   .search-row input {
@@ -394,6 +421,8 @@
       </button>
     </div>
   </header>
+
+  <div id="quota-alarms"></div>
 
   <div class="grid-top">
     <div class="stat-card">
@@ -945,6 +974,18 @@ function buildLimitCardEl(label) {
   return card;
 }
 
+// Weekly-only: daily usage (left) and last-7-weeks usage (right), side by
+// side — inserted only into the weekly card, not the 5-hour one.
+function addUsageColsToWeeklyCard(card) {
+  const cols = document.createElement("div");
+  cols.className = "limit-usage-cols";
+  cols.innerHTML = `
+    <div class="limit-daily-max"></div>
+    <div class="limit-weekly-max"></div>
+  `;
+  card.insertBefore(cols, card.querySelector(".limit-log"));
+}
+
 function renderOneLimitCard(card, windowData, sourceLabel, bucketLabelFn, prevLabel) {
   card.querySelector(".limit-cost").textContent = fmtCost(windowData.cost);
   card.querySelector(".limit-tokens").textContent =
@@ -975,6 +1016,7 @@ function renderLimitGroup(containerEl, groupLimits, sourceKey, sourceLabel) {
   if (groupLimits && groupLimits.weekly) {
     const card = buildLimitCardEl("Weekly window");
     renderOneLimitCard(card, groupLimits.weekly, sourceLabel, weeklyBucketLabel, "Prev 1w");
+    addUsageColsToWeeklyCard(card);
     containerEl.appendChild(card);
     cards.weekly = card;
   }
@@ -1049,6 +1091,139 @@ async function refreshLimitLogs() {
   } catch (e) {
     // Non-critical — leave existing lists as-is.
   }
+}
+
+function shortWeekdayFromDayStr(dayStr) {
+  const [y, m, d] = dayStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return WEEKDAY_NAMES[(date.getDay() + 6) % 7]; // Date.getDay() is 0=Sun; WEEKDAY_NAMES starts Mon.
+}
+
+function pctChipColor(pct) {
+  if (pct >= 80) return "var(--red)";
+  if (pct >= 50) return "var(--accent)";
+  return "var(--green)";
+}
+
+function renderDailyMaxStrip(card, weekRow) {
+  const el = card.querySelector(".limit-daily-max");
+  if (!el) return;
+  if (!weekRow || !weekRow.daily_max || !weekRow.daily_max.length) {
+    el.innerHTML = '<div class="limit-daily-max-empty">No daily quota history yet — accumulates as syncs come in.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="limit-daily-max-label">Daily Usage</div>
+    <div class="pct-chip-row"></div>
+  `;
+  const rowEl = el.querySelector(".pct-chip-row");
+  weekRow.daily_max.forEach(d => {
+    const pct = d.max_percentage || 0;
+    const chip = document.createElement("div");
+    chip.className = "pct-chip";
+    chip.innerHTML = `
+      <div class="pct-chip-label">${escapeHtml(shortWeekdayFromDayStr(d.day))}</div>
+      <div class="pct-chip-value" style="color:${pctChipColor(pct)}">${Math.round(pct)}%</div>
+    `;
+    rowEl.appendChild(chip);
+    attachTooltip(chip, () => `
+      <div class="tt-title">${escapeHtml(fmtDayFull(d.day))}</div>
+      <div class="tt-row">Daily Usage: <b>${pct.toFixed(1)}%</b></div>
+    `);
+  });
+}
+
+function fmtWeekLabel(iso) {
+  const d = new Date(iso);
+  return MONTH_NAMES[d.getMonth()] + " " + d.getDate();
+}
+function fmtWeekRangeLabel(startIso, endIso) {
+  return fmtDateShort(new Date(startIso)) + " – " + fmtDateShort(new Date(endIso));
+}
+
+function renderWeeklyMaxCol(card, weeks) {
+  const el = card.querySelector(".limit-weekly-max");
+  if (!el) return;
+  if (!weeks || !weeks.length) {
+    el.innerHTML = '<div class="limit-daily-max-empty">No weekly quota history yet.</div>';
+    return;
+  }
+  el.innerHTML = `
+    <div class="limit-daily-max-label">Weekly Usage</div>
+    <div class="pct-chip-row"></div>
+  `;
+  const rowEl = el.querySelector(".pct-chip-row");
+  const chronological = weeks.slice().reverse(); // API returns newest-first
+  chronological.forEach(w => {
+    const pct = w.week_max_percentage;
+    const chip = document.createElement("div");
+    chip.className = "pct-chip" + (pct == null ? " pct-chip-empty" : "");
+    chip.innerHTML = `
+      <div class="pct-chip-label">${escapeHtml(fmtWeekLabel(w.window_start))}</div>
+      <div class="pct-chip-value"${pct != null ? ` style="color:${pctChipColor(pct)}"` : ""}>${pct != null ? Math.round(pct) + "%" : "–"}</div>
+    `;
+    rowEl.appendChild(chip);
+    attachTooltip(chip, () => `
+      <div class="tt-title">${escapeHtml(fmtWeekRangeLabel(w.window_start, w.window_end))}</div>
+      <div class="tt-row">${pct != null ? "Usage: <b>" + pct.toFixed(1) + "%</b>" : "No data available"}</div>
+    `);
+  });
+}
+
+async function refreshWeeklyUsage() {
+  const sources = currentSource === "all" ? ["claude", "codex"] : [currentSource];
+  for (const src of sources) {
+    const cards = limitCardRefs[src];
+    if (!cards || !cards.weekly) continue;
+    let weeks = [];
+    try {
+      const res = await fetch("/api/weekly-usage?source=" + src + "&limit=7", { cache: "no-store" });
+      const data = await res.json();
+      weeks = data.weeks || [];
+    } catch (e) {
+      // Non-critical — leave the card's existing columns as-is.
+    }
+    renderDailyMaxStrip(cards.weekly, weeks[0] || null);
+    renderWeeklyMaxCol(cards.weekly, weeks);
+  }
+}
+
+/* ---------- Quota alarms: reset approaching but quota barely touched ---------- */
+const ALARM_HOURS_LEFT = 24;
+const ALARM_MAX_PCT = 50;
+
+function weeklyUsedPercent(weeklyWindow) {
+  if (weeklyWindow.remote_pct != null) return weeklyWindow.remote_pct;
+  const est = weeklyWindow.credit_estimate;
+  if (est && est.available && est.current_pct != null) return est.current_pct;
+  return null; // no way to know usage % without remote data or enough estimate history
+}
+
+function renderQuotaAlarms(limits) {
+  const el = document.getElementById("quota-alarms");
+  if (!limits) { el.innerHTML = ""; return; }
+
+  const sources = [];
+  if (currentSource === "all" || currentSource === "claude") sources.push(["Claude", limits.claude]);
+  if (currentSource === "all" || currentSource === "codex") sources.push(["Codex", limits.codex]);
+
+  const alarms = [];
+  for (const [label, sourceLimits] of sources) {
+    const weeklyWindow = sourceLimits && sourceLimits.weekly;
+    if (!weeklyWindow || weeklyWindow.seconds_remaining == null) continue;
+    if (weeklyWindow.seconds_remaining > ALARM_HOURS_LEFT * 3600) continue;
+    const pct = weeklyUsedPercent(weeklyWindow);
+    if (pct == null || pct >= ALARM_MAX_PCT) continue;
+    alarms.push({ label, pct, secondsRemaining: weeklyWindow.seconds_remaining });
+  }
+
+  el.innerHTML = alarms.map(a => `
+    <div class="alarm-banner">
+      <span class="alarm-icon">⚠️</span>
+      <span><b>${escapeHtml(a.label)}</b> weekly quota resets in <b>${fmtDuration(a.secondsRemaining)}</b> —
+      only <b>${a.pct.toFixed(0)}%</b> used so far. Make the most of it before it resets.</span>
+    </div>
+  `).join("");
 }
 
 function renderCreditEstimate(root, estimate) {
@@ -1604,7 +1779,9 @@ async function refresh() {
     document.getElementById("total-messages").textContent = fmtNum(data.totals.message_count);
 
     renderLimits(data.limits);
+    renderQuotaAlarms(data.limits);
     refreshLimitLogs();
+    refreshWeeklyUsage();
     renderEfficiency(data);
     renderModelTable(data.by_model);
     renderSessionTable("top-session-table", data.top_sessions || [], "rank");

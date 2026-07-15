@@ -584,6 +584,29 @@ def poll_remote_usage_once():
             conn.execute("INSERT OR REPLACE INTO meta (key, value) VALUES ('codex_remote_usage_last_error', '')")
             conn.commit()
 
+    # Extracted from the raw response (not re-read from the DB) so this
+    # doesn't need a second connection/lock right after releasing the one
+    # above — create_limit_snapshot/record_weekly_daily_max below acquire
+    # their own locks and would deadlock if called while still holding it.
+    weekly_pct = None
+    normalized = _normalize_rate_limits(rate_limits)
+    now = datetime.now(timezone.utc)
+    for win in (normalized.get("primary"), normalized.get("secondary")):
+        if not win or not win.get("window_minutes"):
+            continue
+        if WEEKLY_MINUTES_RANGE[0] <= win["window_minutes"] <= WEEKLY_MINUTES_RANGE[1]:
+            mapped = _map_window(win, now)
+            if mapped:
+                weekly_pct = mapped["remote_pct"]
+            break
+
+    if weekly_pct is not None:
+        snapshot = server.create_limit_snapshot(SOURCE_NAME, "weekly", weekly_pct)
+        if snapshot.get("saved"):
+            server.record_weekly_daily_max(
+                SOURCE_NAME, weekly_pct, snapshot["window_start"], snapshot["window_end"], snapshot["created_at"]
+            )
+
     return {"ok": True}
 
 

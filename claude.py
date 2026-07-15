@@ -515,7 +515,11 @@ def poll_remote_usage_once():
     if five_hour_pct is not None:
         server.create_limit_snapshot(SOURCE_NAME, "five_hour", five_hour_pct)
     if weekly_pct is not None:
-        server.create_limit_snapshot(SOURCE_NAME, "weekly", weekly_pct)
+        snapshot = server.create_limit_snapshot(SOURCE_NAME, "weekly", weekly_pct)
+        if snapshot.get("saved"):
+            server.record_weekly_daily_max(
+                SOURCE_NAME, weekly_pct, snapshot["window_start"], snapshot["window_end"], snapshot["created_at"]
+            )
 
     return {"ok": True}
 

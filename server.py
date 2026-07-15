@@ -204,6 +204,32 @@ def init_db():
             )
             """
         )
+        # Not dropped on schema bump — this is user-observed history (the
+        # remote-polled utilization %) that can't be regenerated from logs,
+        # same rationale as limit_snapshots above.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS weekly_windows (
+                source TEXT NOT NULL,
+                window_start TEXT NOT NULL,
+                window_end TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (source, window_start)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS weekly_daily_max_pct (
+                source TEXT NOT NULL,
+                window_start TEXT NOT NULL,
+                day TEXT NOT NULL,
+                max_percentage REAL NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (source, window_start, day)
+            )
+            """
+        )
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_day ON messages(day)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_model ON messages(model)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project)")
@@ -681,6 +707,249 @@ def list_limit_snapshots(source=None, limit=200):
         return [{k: r[k] for k in r.keys()} for r in rows]
 
 
+def _floor_window_key(iso_str):
+    """Normalize a window_start/window_end to whole-minute resolution before
+    using it as a dedup key. Confirmed empirically: the remote-reported reset
+    timestamp for the same real weekly window jitters by about a second
+    between polls, straddling a minute boundary — 643 polls against one real
+    window (true boundary 10:00:00) came back split ~evenly between
+    09:59:59.xxx and 10:00:00.xxx. A plain floor would keep that split (09:59
+    vs 10:00); rounding to the nearest minute collapses both sides onto the
+    same key. Without this, every poll would fragment one real window into
+    its own near-duplicate weekly_windows row."""
+    dt = _parse_ts(iso_str)
+    if dt is None:
+        return iso_str
+    if dt.second >= 30:
+        dt = dt + timedelta(minutes=1)
+    return dt.replace(second=0, microsecond=0).isoformat()
+
+
+def _validate_percentage(percentage):
+    try:
+        percentage = float(percentage)
+    except (TypeError, ValueError):
+        raise ValueError("percentage must be a number")
+    if not (0 <= percentage <= 100):
+        raise ValueError("percentage must be between 0 and 100")
+    return percentage
+
+
+def _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end, observed_at):
+    """Write half of record_weekly_daily_max, taking an already-open `conn`
+    so callers doing many writes (backfill_weekly_usage_from_snapshots) can
+    share one connection instead of opening one per row — `with get_conn()`
+    commits/rolls back on exit but does NOT close the connection, so a tight
+    loop calling get_conn() per iteration leaks a file descriptor per call
+    and can exhaust the process's fd limit (confirmed: backfilling 643
+    historical rows this way crashed the dashboard under launchd's default
+    limit, which is far lower than an interactive shell's)."""
+    window_start = _floor_window_key(window_start)
+    window_end = _floor_window_key(window_end)
+    day, _, _ = day_fields(observed_at)
+
+    conn.execute(
+        """
+        INSERT INTO weekly_windows (source, window_start, window_end, created_at)
+        VALUES (?, ?, ?, ?)
+        ON CONFLICT(source, window_start) DO NOTHING
+        """,
+        (source, window_start, window_end, observed_at),
+    )
+    conn.execute(
+        """
+        INSERT INTO weekly_daily_max_pct (source, window_start, day, max_percentage, updated_at)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(source, window_start, day) DO UPDATE SET
+            max_percentage = MAX(max_percentage, excluded.max_percentage),
+            updated_at = excluded.updated_at
+        """,
+        (source, window_start, day, percentage, observed_at),
+    )
+
+
+def record_weekly_daily_max(source, percentage, window_start, window_end, observed_at=None):
+    """Track, per weekly-limit window, the highest utilization % observed on
+    each calendar day within it. `percentage` only exists as remote-polled
+    data — there's no way to derive or backfill it from local session/cost
+    data — so this must be called with a live reading, paired with the
+    (window_start, window_end) that reading belongs to (as returned by
+    create_limit_snapshot, so both stay pinned to the same window).
+
+    `observed_at` (ISO timestamp) defaults to now — pass the reading's own
+    original timestamp instead when replaying history (see
+    backfill_weekly_usage_from_snapshots), so the day it lands on is the day
+    it was actually observed, not the day the backfill happened to run."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+    percentage = _validate_percentage(percentage)
+    if observed_at is None:
+        observed_at = datetime.now(timezone.utc).isoformat()
+
+    with _db_lock:
+        conn = get_conn()
+        try:
+            _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end, observed_at)
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def backfill_weekly_usage_from_snapshots(source):
+    """Replay a source's own limit_snapshots history (window_type='weekly')
+    into weekly_windows/weekly_daily_max_pct. Covers readings recorded before
+    daily-max tracking existed — Claude has been polling and storing weekly
+    snapshots for a while; Codex only gained the same wiring alongside this
+    feature, so it has no such backlog (yet).
+
+    Idempotent: re-applies the same MAX upserts every time, so it's cheap and
+    safe to call unconditionally on every server start rather than needing a
+    one-shot migration flag. Uses a single connection for the whole replay
+    (can be hundreds of rows) rather than one per row — see
+    _upsert_weekly_daily_max's docstring for why that matters."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+    with _db_lock:
+        conn = get_conn()
+        try:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT percentage, window_start, window_end, created_at
+                FROM limit_snapshots
+                WHERE source = ? AND window_type = 'weekly'
+                ORDER BY created_at ASC
+                """,
+                (source,),
+            ).fetchall()
+            for row in rows:
+                percentage = _validate_percentage(row["percentage"])
+                _upsert_weekly_daily_max(
+                    conn, source, percentage, row["window_start"], row["window_end"], row["created_at"]
+                )
+            conn.commit()
+        finally:
+            conn.close()
+
+
+def list_weekly_usage(source=None, limit=20):
+    """Every tracked weekly window (most recent first), each with its
+    per-day utilization high-water-marks nested underneath (oldest day
+    first)."""
+    if source is not None and source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        if source:
+            windows = conn.execute(
+                """
+                SELECT source, window_start, window_end, created_at
+                FROM weekly_windows WHERE source = ?
+                ORDER BY window_start DESC LIMIT ?
+                """,
+                (source, limit),
+            ).fetchall()
+        else:
+            windows = conn.execute(
+                """
+                SELECT source, window_start, window_end, created_at
+                FROM weekly_windows
+                ORDER BY window_start DESC LIMIT ?
+                """,
+                (limit,),
+            ).fetchall()
+
+        result = []
+        for w in windows:
+            days = conn.execute(
+                """
+                SELECT day, max_percentage, updated_at
+                FROM weekly_daily_max_pct
+                WHERE source = ? AND window_start = ?
+                ORDER BY day ASC
+                """,
+                (w["source"], w["window_start"]),
+            ).fetchall()
+            daily_max = [
+                {"day": d["day"], "max_percentage": d["max_percentage"], "updated_at": d["updated_at"]}
+                for d in days
+            ]
+            result.append({
+                "source": w["source"],
+                "window_start": w["window_start"],
+                "window_end": w["window_end"],
+                "created_at": w["created_at"],
+                "daily_max": daily_max,
+                # Utilization only rises within a window (it resets at window_end),
+                # so the week's overall peak is just the max of its daily maxes.
+                # None (not 0) when no reading was ever recorded for the week, so
+                # callers can distinguish "unused" from "unknown".
+                "week_max_percentage": max((d["max_percentage"] for d in daily_max), default=None),
+            })
+        return result
+
+
+def get_weekly_usage_window(source, window_start):
+    """Single weekly window lookup by its exact key, with nested daily
+    high-water-marks. Returns None if that window has never been recorded."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        w = conn.execute(
+            """
+            SELECT source, window_start, window_end, created_at
+            FROM weekly_windows WHERE source = ? AND window_start = ?
+            """,
+            (source, window_start),
+        ).fetchone()
+        if w is None:
+            return None
+        days = conn.execute(
+            """
+            SELECT day, max_percentage, updated_at
+            FROM weekly_daily_max_pct
+            WHERE source = ? AND window_start = ?
+            ORDER BY day ASC
+            """,
+            (source, window_start),
+        ).fetchall()
+        daily_max = [
+            {"day": d["day"], "max_percentage": d["max_percentage"], "updated_at": d["updated_at"]}
+            for d in days
+        ]
+        return {
+            "source": w["source"],
+            "window_start": w["window_start"],
+            "window_end": w["window_end"],
+            "created_at": w["created_at"],
+            "daily_max": daily_max,
+            "week_max_percentage": max((d["max_percentage"] for d in daily_max), default=None),
+        }
+
+
+def delete_weekly_usage_window(source, window_start):
+    """Remove a weekly window and its nested daily high-water-marks. Returns
+    True if a window was actually deleted, False if it didn't exist."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+
+    with _db_lock:
+        with get_conn() as conn:
+            conn.execute(
+                "DELETE FROM weekly_daily_max_pct WHERE source = ? AND window_start = ?",
+                (source, window_start),
+            )
+            cur = conn.execute(
+                "DELETE FROM weekly_windows WHERE source = ? AND window_start = ?",
+                (source, window_start),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+
+
 # ---------------------------------------------------------------------------
 # Aggregation for the API response
 # ---------------------------------------------------------------------------
@@ -1089,6 +1358,16 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 self._send_error_json(400, f"unknown source; expected one of: {', '.join(SOURCES)}")
                 return
             self._send_json_result(lambda: {"snapshots": list_limit_snapshots(source)})
+        elif parsed.path == "/api/weekly-usage":
+            source = qs.get("source", [None])[0]
+            if source is not None and source not in SOURCES:
+                self._send_error_json(400, f"unknown source; expected one of: {', '.join(SOURCES)}")
+                return
+            try:
+                limit = int(qs.get("limit", ["20"])[0])
+            except ValueError:
+                limit = 20
+            self._send_json_result(lambda: {"weeks": list_weekly_usage(source, limit)})
         else:
             self.send_response(404)
             self.end_headers()
@@ -1155,6 +1434,8 @@ class ThreadingHTTPServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 def main():
     init_db()
+    for source in SOURCES:
+        backfill_weekly_usage_from_snapshots(source)
     scan_all()  # warm the cache before first request
     for module in SOURCES.values():
         if hasattr(module, "start_background_poll"):
