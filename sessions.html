@@ -87,6 +87,12 @@
   .tsub { color: var(--muted); font-size: 11px; margin-top: 2px; font-family: monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
   .tsub-num { color: var(--muted); font-size: 10.5px; margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .sid-cell { font-family: monospace; font-size: 12px; color: var(--muted); }
+  .source-badge {
+    display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase; padding: 2px 7px; border-radius: 4px;
+  }
+  .source-badge.src-claude { background: rgba(217,119,87,0.18); color: var(--accent); }
+  .source-badge.src-codex { background: rgba(110,168,254,0.18); color: var(--accent2); }
   .copy-btn {
     background: none; border: 1px solid var(--border); border-radius: 5px; color: var(--muted);
     font-size: 11px; line-height: 1; padding: 3px 6px; cursor: pointer; margin-left: 6px; vertical-align: middle;
@@ -148,6 +154,11 @@
     </div>
     <div class="controls-row">
       <input type="text" id="search-input" placeholder="Search name, path, project, or session ID…" autocomplete="off" spellcheck="false">
+      <select id="source-filter">
+        <option value="">All sources</option>
+        <option value="claude">Claude</option>
+        <option value="codex">Codex</option>
+      </select>
       <select id="project-filter"><option value="">All projects</option></select>
       <span class="result-count" id="result-count">–</span>
     </div>
@@ -155,6 +166,7 @@
       <table id="sessions-table">
         <thead>
           <tr>
+            <th data-key="source">Source<span class="sort-arrow">▾</span></th>
             <th data-key="title">Name<span class="sort-arrow">▾</span></th>
             <th data-key="session_id">Session ID<span class="sort-arrow">▾</span></th>
             <th class="num" data-key="message_count">Msgs<span class="sort-arrow">▾</span></th>
@@ -166,7 +178,7 @@
             <th data-key="end_ts">Ended<span class="sort-arrow">▾</span></th>
           </tr>
         </thead>
-        <tbody><tr><td colspan="9" class="empty">Loading…</td></tr></tbody>
+        <tbody><tr><td colspan="10" class="empty">Loading…</td></tr></tbody>
       </table>
     </div>
   </section>
@@ -248,8 +260,10 @@ function computeRowFields(r) {
 function applySortFilter() {
   const q = document.getElementById("search-input").value.trim().toLowerCase();
   const project = document.getElementById("project-filter").value;
+  const source = document.getElementById("source-filter").value;
 
   let rows = allSessions;
+  if (source) rows = rows.filter(r => r.source === source);
   if (project) rows = rows.filter(r => r.project === project);
   if (q) {
     rows = rows.filter(r => {
@@ -265,6 +279,7 @@ function applySortFilter() {
     else if (sortKey === "models") { av = a.models_clean.toLowerCase(); bv = b.models_clean.toLowerCase(); }
     else if (sortKey === "start_ts" || sortKey === "end_ts") { av = new Date(a[sortKey] || 0).getTime(); bv = new Date(b[sortKey] || 0).getTime(); }
     else if (sortKey === "session_id") { av = a.session_id || ""; bv = b.session_id || ""; }
+    else if (sortKey === "source") { av = a.source || ""; bv = b.source || ""; }
     else { av = Number(a[sortKey]) || 0; bv = Number(b[sortKey]) || 0; }
 
     if (av < bv) return -1 * sortDir;
@@ -311,13 +326,15 @@ function renderTable(rows) {
   const tbody = document.querySelector("#sessions-table tbody");
   tbody.innerHTML = "";
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" class="empty">No sessions match.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" class="empty">No sessions match.</td></tr>';
     return;
   }
   for (const r of rows) {
     const displayTitle = displayTitleFor(r);
+    const sourceLabel = r.source === "codex" ? "Codex" : "Claude";
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td><span class="source-badge src-${escapeHtml(r.source || "claude")}">${escapeHtml(sourceLabel)}</span></td>
       <td>
         <div class="tname" title="${escapeHtml(displayTitle)}">${escapeHtml(displayTitle)}</div>
         ${r.cwd ? `<div class="tsub" title="${escapeHtml(r.cwd)}">${escapeHtml(r.cwd)}</div>` : ""}
@@ -377,6 +394,7 @@ document.querySelectorAll("#sessions-table thead th").forEach(th => {
 
 document.getElementById("search-input").addEventListener("input", applySortFilter);
 document.getElementById("project-filter").addEventListener("change", applySortFilter);
+document.getElementById("source-filter").addEventListener("change", applySortFilter);
 
 document.getElementById("theme-toggle").addEventListener("click", () => {
   const html = document.documentElement;
@@ -394,7 +412,7 @@ async function load() {
     applySortFilter();
   } catch (e) {
     document.querySelector("#sessions-table tbody").innerHTML =
-      '<tr><td colspan="9" class="empty">Could not reach dashboard server: ' + escapeHtml(String(e)) + '</td></tr>';
+      '<tr><td colspan="10" class="empty">Could not reach dashboard server: ' + escapeHtml(String(e)) + '</td></tr>';
   }
 }
 load();

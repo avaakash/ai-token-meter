@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Claude Token Usage Dashboard</title>
+<title>Token Usage Dashboard</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>
   // Runs before CSS is applied to avoid a flash of the wrong theme.
@@ -125,6 +125,8 @@
 
 
   .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .sync-cluster { display: flex; align-items: baseline; justify-content: flex-end; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .sync-cluster .desc { margin-right: auto; }
   .section-head h2 { font-size: 15px; font-weight: 650; margin: 0; color: var(--text); }
   .section-head .desc { font-size: 12.5px; color: var(--muted); }
 
@@ -175,6 +177,38 @@
   }
   .sync-btn:hover { border-color: var(--accent2); }
   .sync-btn:disabled { opacity: .6; cursor: default; }
+
+  /* ---------- Source toggle ---------- */
+  .source-toggle {
+    display: inline-flex; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0;
+  }
+  .source-toggle button {
+    background: transparent; border: none; color: var(--muted); cursor: pointer;
+    font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 6px;
+    font-family: inherit;
+  }
+  .source-toggle button:hover { color: var(--text); }
+  .source-toggle button.active { background: var(--accent); color: var(--accent-text); }
+
+  .source-badge {
+    display: inline-block; font-size: 9.5px; font-weight: 700; letter-spacing: .03em;
+    text-transform: uppercase; padding: 1px 6px; border-radius: 4px; margin-right: 6px;
+    vertical-align: 1px;
+  }
+  .source-badge.src-claude { background: rgba(217,119,87,0.18); color: var(--accent); }
+  .source-badge.src-codex { background: rgba(110,168,254,0.18); color: var(--accent2); }
+
+  .limit-group-label {
+    font-size: 12px; font-weight: 650; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .04em; margin: 18px 0 10px;
+  }
+  .limit-group-label:first-child { margin-top: 0; }
+  .limit-empty-note {
+    color: var(--muted); font-size: 12.5px; padding: 14px 16px; background: var(--card-alt);
+    border: 1px dashed var(--border); border-radius: 10px;
+  }
+  .pricing-unverified { color: var(--red); font-weight: 600; }
 
   .api-info-panel {
     background: var(--card-alt); border: 1px solid var(--border); border-radius: 10px;
@@ -338,7 +372,6 @@
   /* ---------- Misc ---------- */
   .empty { color: var(--muted); font-size: 13px; padding: 14px 0; }
   footer { color: var(--muted); font-size: 11.5px; text-align: center; margin-top: 28px; }
-  #pricing-note.stale { color: var(--red); font-weight: 600; }
   code { background: var(--card-alt); padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 </style>
 </head>
@@ -346,13 +379,20 @@
 <div class="wrap">
   <header class="header-row">
     <div>
-      <h1>Claude Token Usage &amp; Estimated Cost</h1>
+      <h1>Token Usage &amp; Estimated Cost</h1>
       <div class="sub"><span id="status-dot"></span><span id="status-text">Loading…</span> · <a class="nav-link" href="/sessions.html">All sessions &rarr;</a></div>
     </div>
-    <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
-      <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-      <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-    </button>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <div class="source-toggle" id="source-toggle" role="tablist" aria-label="Usage source">
+        <button type="button" data-source="all">Both</button>
+        <button type="button" data-source="claude">Claude</button>
+        <button type="button" data-source="codex">Codex</button>
+      </div>
+      <button id="theme-toggle" class="theme-toggle" aria-label="Toggle light/dark theme" title="Toggle light/dark theme">
+        <svg class="icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg class="icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+    </div>
   </header>
 
   <div class="grid-top">
@@ -381,12 +421,16 @@
   <section>
     <div class="section-head">
       <h2>Rate limit windows</h2>
-      <span class="desc" id="remote-sync-status">Spend within your current 5-hour and weekly windows</span>
-      <button id="api-info-btn" class="sync-btn" title="About Claude API sync">Claude API ⓘ</button>
-      <button id="sync-now-btn" class="sync-btn">Sync now</button>
+      <span class="desc">Spend within your current 5-hour and weekly windows</span>
     </div>
-    <div class="api-info-panel" id="api-info-panel" hidden>
-      <div class="api-info-status" id="api-info-status">–</div>
+
+    <div class="sync-cluster" data-source="claude">
+      <span class="desc" id="claude-remote-sync-status">–</span>
+      <button id="claude-api-info-btn" class="sync-btn" title="About Claude API sync">Claude API ⓘ</button>
+      <button id="claude-sync-now-btn" class="sync-btn">Sync now</button>
+    </div>
+    <div class="api-info-panel" id="claude-api-info-panel" hidden>
+      <div class="api-info-status" id="claude-api-info-status">–</div>
       <p>This dashboard reads your real usage percentage and reset times directly from Anthropic, authenticated using the OAuth token Claude Code already stores in your macOS Keychain — no separate login or API key needed.</p>
       <p><b>To enable it:</b></p>
       <ol>
@@ -396,53 +440,24 @@
       </ol>
       <p>Without this, the dashboard falls back to a local estimate for window boundaries and skips the "Claude-reported" percentage line on each card.</p>
     </div>
-    <div class="limit-grid">
-      <div class="limit-card">
-        <div class="limit-card-head">
-          <div class="label">5-hour window</div>
-          <div class="value accent" id="fivehour-cost">–</div>
-        </div>
-        <div class="sub" id="fivehour-tokens">–</div>
-        <div class="sub" id="fivehour-range">–</div>
-        <div class="sub" id="fivehour-remote">–</div>
-        <div class="sub" id="fivehour-prev">–</div>
 
-        <div class="mini-chart">
-          <div class="mini-bars" id="fivehour-bars"></div>
-          <div class="mini-bar-labels" id="fivehour-bar-labels"></div>
-        </div>
-
-        <div class="limit-breakdown" id="fivehour-breakdown"></div>
-
-        <div class="sub" id="fivehour-estimate">–</div>
-        <div class="limit-log">
-          <div class="limit-log-list" id="fivehour-log-list"></div>
-        </div>
-      </div>
-
-      <div class="limit-card">
-        <div class="limit-card-head">
-          <div class="label">Weekly window</div>
-          <div class="value accent" id="weekly-cost">–</div>
-        </div>
-        <div class="sub" id="weekly-tokens">–</div>
-        <div class="sub" id="weekly-range">–</div>
-        <div class="sub" id="weekly-remote">–</div>
-        <div class="sub" id="weekly-prev">–</div>
-
-        <div class="mini-chart">
-          <div class="mini-bars" id="weekly-bars"></div>
-          <div class="mini-bar-labels" id="weekly-bar-labels"></div>
-        </div>
-
-        <div class="limit-breakdown" id="weekly-breakdown"></div>
-
-        <div class="sub" id="weekly-estimate">–</div>
-        <div class="limit-log">
-          <div class="limit-log-list" id="weekly-log-list"></div>
-        </div>
-      </div>
+    <div class="sync-cluster" data-source="codex">
+      <span class="desc" id="codex-remote-sync-status">–</span>
+      <button id="codex-api-info-btn" class="sync-btn" title="About Codex API sync">Codex API ⓘ</button>
+      <button id="codex-sync-now-btn" class="sync-btn">Sync now</button>
     </div>
+    <div class="api-info-panel" id="codex-api-info-panel" hidden>
+      <div class="api-info-status" id="codex-api-info-status">–</div>
+      <p>This dashboard reads your real plan usage percentage and reset time from Codex CLI's own <code>account/rateLimits/read</code> RPC, authenticated using the OAuth token already stored in <code>~/.codex/auth.json</code> — no separate login needed. Only meaningful when logged in via a ChatGPT plan; pure API-key billing has no quota to report.</p>
+      <p><b>To enable it:</b></p>
+      <ol>
+        <li>Install the <a href="https://developers.openai.com/codex/cli/" target="_blank" rel="noopener">Codex CLI</a> and log in with a ChatGPT plan</li>
+        <li>Click "Sync now" above, or wait up to 10 minutes for the next automatic sync</li>
+      </ol>
+      <p>Without this, the dashboard falls back to whatever Codex last happened to log inline (may be stale or absent) and skips the "Codex-reported" percentage line on each card.</p>
+    </div>
+
+    <div id="limit-groups"></div>
   </section>
 
   <section>
@@ -656,6 +671,30 @@ const REFRESH_MS = 60000;
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const WEEKDAY_NAMES = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
+/* ---------- Usage source (Claude / Codex / Both) ---------- */
+let currentSource = localStorage.getItem("dashboard-source") || "all";
+
+function sourceBadgeHtml(source) {
+  if (currentSource !== "all" || !source) return "";
+  const label = source === "codex" ? "Codex" : "Claude";
+  return `<span class="source-badge src-${escapeHtml(source)}">${label}</span>`;
+}
+
+function initSourceToggle() {
+  const buttons = document.querySelectorAll("#source-toggle button");
+  const applyActive = () => buttons.forEach(b => b.classList.toggle("active", b.dataset.source === currentSource));
+  applyActive();
+  buttons.forEach(btn => {
+    btn.addEventListener("click", () => {
+      if (btn.dataset.source === currentSource) return;
+      currentSource = btn.dataset.source;
+      localStorage.setItem("dashboard-source", currentSource);
+      applyActive();
+      refresh();
+    });
+  });
+}
+
 /* ---------- Shared hover tooltip ---------- */
 const tooltipEl = document.createElement("div");
 tooltipEl.className = "dash-tooltip";
@@ -761,8 +800,8 @@ const LIMIT_TOKEN_TYPES = [
   ["cache-write", "Cache write", "cache_write_tokens", "cost_cache_write"],
 ];
 
-function renderLimitBreakdown(prefix, data) {
-  const el = document.getElementById(prefix + "-breakdown");
+function renderLimitBreakdown(root, data) {
+  const el = root.querySelector(".limit-breakdown");
   el.innerHTML = LIMIT_TOKEN_TYPES.map(([cls, label, tokKey, costKey]) => `
     <div class="limit-breakdown-item">
       <div class="limit-breakdown-label"><span class="swatch seg-${cls}"></span>${label}</div>
@@ -772,9 +811,9 @@ function renderLimitBreakdown(prefix, data) {
   `).join("");
 }
 
-function renderMiniBars(barsId, labelsId, buckets, labelFn) {
-  const barsEl = document.getElementById(barsId);
-  const labelsEl = document.getElementById(labelsId);
+function renderMiniBars(root, buckets, labelFn) {
+  const barsEl = root.querySelector(".mini-bars");
+  const labelsEl = root.querySelector(".mini-bar-labels");
   barsEl.innerHTML = "";
   labelsEl.innerHTML = "";
   if (!buckets || !buckets.length) return;
@@ -824,8 +863,8 @@ function weeklyBucketLabel(b) {
   });
 }
 
-function renderPrevLine(elId, cost, previous, label) {
-  const el = document.getElementById(elId);
+function renderPrevLine(root, cls, cost, previous, label) {
+  const el = root.querySelector("." + cls);
   if (!previous) { el.textContent = ""; return; }
   let diffText = "";
   if (previous.cost > 0) {
@@ -836,20 +875,30 @@ function renderPrevLine(elId, cost, previous, label) {
   el.textContent = label + ": " + fmtCost(previous.cost) + diffText;
 }
 
-function renderRemoteLine(elId, window) {
-  const el = document.getElementById(elId);
+function renderRemoteLine(root, sourceLabel, window) {
+  const el = root.querySelector(".limit-remote");
   if (window.source === "remote" && window.remote_pct != null) {
-    el.textContent = "Claude-reported: " + window.remote_pct + "% used";
+    el.textContent = sourceLabel + "-reported: " + window.remote_pct + "% used";
   } else {
-    el.textContent = "Claude-reported: unavailable — showing local estimate";
+    el.textContent = sourceLabel + "-reported: unavailable — showing local estimate";
   }
 }
 
-function renderSyncStatus(limits) {
-  const el = document.getElementById("remote-sync-status");
-  const infoEl = document.getElementById("api-info-status");
-  const status = limits.remote_status || {};
+// Sync controls (the "Claude API ⓘ" button + "Sync now") are Claude-only —
+// Codex has no poll loop, its rate-limit data (when present) is inline in
+// its own logs and refreshed by the normal incremental scan.
+function renderSyncStatus(source, sourceLimits) {
+  const label = source === "codex" ? "Codex" : "Claude";
+  const el = document.getElementById(source + "-remote-sync-status");
+  const infoEl = document.getElementById(source + "-api-info-status");
+  const cluster = document.querySelector(`.sync-cluster[data-source="${source}"]`);
+  const panel = document.getElementById(source + "-api-info-panel");
+  const visible = currentSource === "all" || currentSource === source;
+  cluster.style.display = visible ? "" : "none";
+  if (!visible) { panel.hidden = true; return; }
+  if (!sourceLimits) return;
 
+  const status = sourceLimits.remote_status || {};
   if (status.last_error) {
     el.textContent = "Sync failed: " + status.last_error;
     el.style.color = "var(--red)";
@@ -858,59 +907,127 @@ function renderSyncStatus(limits) {
     return;
   }
   el.style.color = "";
-  if (limits.remote_polled_at) {
-    const mins = Math.max(0, Math.round((Date.now() - new Date(limits.remote_polled_at).getTime()) / 60000));
+  if (sourceLimits.remote_polled_at) {
+    const mins = Math.max(0, Math.round((Date.now() - new Date(sourceLimits.remote_polled_at).getTime()) / 60000));
     const agoText = mins < 1 ? "just now" : mins + "m ago";
-    el.textContent = "Synced with Claude " + agoText;
+    el.textContent = "Synced with " + label + " " + agoText;
     infoEl.textContent = "✅ Connected — last synced " + agoText;
     infoEl.className = "api-info-status ok";
   } else {
-    el.textContent = "Not yet synced with Claude — showing local estimate";
+    el.textContent = "Not yet synced with " + label + " — showing local estimate";
     infoEl.textContent = "⏳ Not yet synced — showing local estimate until the first sync completes";
     infoEl.className = "api-info-status";
   }
 }
 
-function renderLimits(limits) {
-  if (!limits) return;
-  renderSyncStatus(limits);
-  const fh = limits.five_hour;
-  if (fh) {
-    document.getElementById("fivehour-cost").textContent = fmtCost(fh.cost);
-    document.getElementById("fivehour-tokens").textContent =
-      fmtNum((fh.input_tokens || 0) + (fh.output_tokens || 0)) + " tokens · " + fmtNum(fh.message_count) + " msgs";
-    document.getElementById("fivehour-range").textContent =
-      "Started " + fmtIST(fh.window_start) + " · ends " + fmtISTFull(fh.window_end) +
-      " (in " + fmtDuration(fh.seconds_remaining) + ")";
-    renderRemoteLine("fivehour-remote", fh);
-    renderPrevLine("fivehour-prev", fh.cost, fh.previous, "Prev 5hr");
-    renderMiniBars("fivehour-bars", "fivehour-bar-labels", fh.buckets, fiveHourBucketLabel);
-    renderLimitBreakdown("fivehour", fh);
-    renderCreditEstimate("fivehour-estimate", fh.credit_estimate);
+const LIMIT_CARD_TEMPLATE = (label) => `
+  <div class="limit-card-head">
+    <div class="label">${escapeHtml(label)}</div>
+    <div class="value accent limit-cost">–</div>
+  </div>
+  <div class="sub limit-tokens">–</div>
+  <div class="sub limit-range">–</div>
+  <div class="sub limit-remote">–</div>
+  <div class="sub limit-prev">–</div>
+  <div class="mini-chart">
+    <div class="mini-bars"></div>
+    <div class="mini-bar-labels"></div>
+  </div>
+  <div class="limit-breakdown"></div>
+  <div class="sub limit-estimate">–</div>
+  <div class="limit-log"><div class="limit-log-list"></div></div>
+`;
+
+function buildLimitCardEl(label) {
+  const card = document.createElement("div");
+  card.className = "limit-card";
+  card.innerHTML = LIMIT_CARD_TEMPLATE(label);
+  return card;
+}
+
+function renderOneLimitCard(card, windowData, sourceLabel, bucketLabelFn, prevLabel) {
+  card.querySelector(".limit-cost").textContent = fmtCost(windowData.cost);
+  card.querySelector(".limit-tokens").textContent =
+    fmtNum((windowData.input_tokens || 0) + (windowData.output_tokens || 0)) + " tokens · " + fmtNum(windowData.message_count) + " msgs";
+  card.querySelector(".limit-range").textContent =
+    "Started " + fmtIST(windowData.window_start) + " · ends " + fmtISTFull(windowData.window_end) +
+    " (in " + fmtDuration(windowData.seconds_remaining) + ")";
+  renderRemoteLine(card, sourceLabel, windowData);
+  renderPrevLine(card, "limit-prev", windowData.cost, windowData.previous, prevLabel);
+  renderMiniBars(card, windowData.buckets, bucketLabelFn);
+  renderLimitBreakdown(card, windowData);
+  renderCreditEstimate(card, windowData.credit_estimate);
+}
+
+// Cards created per (source, window_type) so refreshLimitLogs can find them
+// again without relying on fixed ids (there can be up to 4 at once: Claude
+// and Codex each have their own five_hour/weekly card, or fewer/none).
+let limitCardRefs = {};
+
+function renderLimitGroup(containerEl, groupLimits, sourceKey, sourceLabel) {
+  const cards = {};
+  if (groupLimits && groupLimits.five_hour) {
+    const card = buildLimitCardEl("5-hour window");
+    renderOneLimitCard(card, groupLimits.five_hour, sourceLabel, fiveHourBucketLabel, "Prev 5hr");
+    containerEl.appendChild(card);
+    cards.five_hour = card;
   }
-  const wk = limits.weekly;
-  if (wk) {
-    document.getElementById("weekly-cost").textContent = fmtCost(wk.cost);
-    document.getElementById("weekly-tokens").textContent =
-      fmtNum((wk.input_tokens || 0) + (wk.output_tokens || 0)) + " tokens · " + fmtNum(wk.message_count) + " msgs";
-    document.getElementById("weekly-range").textContent =
-      "Started " + fmtIST(wk.window_start) + " · ends " + fmtISTFull(wk.window_end) +
-      " (in " + fmtDuration(wk.seconds_remaining) + ")";
-    renderRemoteLine("weekly-remote", wk);
-    renderPrevLine("weekly-prev", wk.cost, wk.previous, "Prev 1w");
-    renderMiniBars("weekly-bars", "weekly-bar-labels", wk.buckets, weeklyBucketLabel);
-    renderLimitBreakdown("weekly", wk);
-    renderCreditEstimate("weekly-estimate", wk.credit_estimate);
+  if (groupLimits && groupLimits.weekly) {
+    const card = buildLimitCardEl("Weekly window");
+    renderOneLimitCard(card, groupLimits.weekly, sourceLabel, weeklyBucketLabel, "Prev 1w");
+    containerEl.appendChild(card);
+    cards.weekly = card;
+  }
+  if (!cards.five_hour && !cards.weekly) {
+    containerEl.innerHTML = `<div class="limit-empty-note">No rate-limit data available for ${escapeHtml(sourceLabel)} right now.</div>`;
+  }
+  return cards;
+}
+
+function renderLimits(limits) {
+  const container = document.getElementById("limit-groups");
+  container.innerHTML = "";
+  limitCardRefs = {};
+  if (!limits) return;
+
+  renderSyncStatus("claude", limits.claude);
+  renderSyncStatus("codex", limits.codex);
+
+  const showClaude = currentSource === "all" || currentSource === "claude";
+  const showCodex = currentSource === "all" || currentSource === "codex";
+
+  if (showClaude) {
+    if (currentSource === "all") {
+      const label = document.createElement("div");
+      label.className = "limit-group-label";
+      label.textContent = "Claude";
+      container.appendChild(label);
+    }
+    const grid = document.createElement("div");
+    grid.className = "limit-grid";
+    container.appendChild(grid);
+    limitCardRefs.claude = renderLimitGroup(grid, limits.claude, "claude", "Claude");
+  }
+  if (showCodex) {
+    if (currentSource === "all") {
+      const label = document.createElement("div");
+      label.className = "limit-group-label";
+      label.textContent = "Codex";
+      container.appendChild(label);
+    }
+    const grid = document.createElement("div");
+    grid.className = "limit-grid";
+    container.appendChild(grid);
+    limitCardRefs.codex = renderLimitGroup(grid, limits.codex, "codex", "Codex");
   }
 }
 
-function renderLimitLog(listId, snapshots) {
-  const el = document.getElementById(listId);
+function renderLimitLog(listEl, snapshots) {
   if (!snapshots || !snapshots.length) {
-    el.innerHTML = '<div class="limit-log-empty">No entries logged yet.</div>';
+    listEl.innerHTML = '<div class="limit-log-empty">No entries logged yet.</div>';
     return;
   }
-  el.innerHTML = snapshots.slice(0, 5).map(s => {
+  listEl.innerHTML = snapshots.slice(0, 5).map(s => {
     const when = new Date(s.created_at).toLocaleString("en-IN", {
       timeZone: "Asia/Kolkata", month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
     }) + " IST";
@@ -918,22 +1035,24 @@ function renderLimitLog(listId, snapshots) {
   }).join("");
 }
 
-let limitSnapshotCache = [];
-
 async function refreshLimitLogs() {
   try {
     const res = await fetch("/api/limit-snapshots", { cache: "no-store" });
     const data = await res.json();
-    limitSnapshotCache = data.snapshots || [];
-    renderLimitLog("fivehour-log-list", limitSnapshotCache.filter(s => s.window_type === "five_hour"));
-    renderLimitLog("weekly-log-list", limitSnapshotCache.filter(s => s.window_type === "weekly"));
+    const snapshots = data.snapshots || [];
+    for (const [sourceKey, cards] of Object.entries(limitCardRefs)) {
+      for (const [windowType, card] of Object.entries(cards)) {
+        const listEl = card.querySelector(".limit-log-list");
+        renderLimitLog(listEl, snapshots.filter(s => s.source === sourceKey && s.window_type === windowType));
+      }
+    }
   } catch (e) {
     // Non-critical — leave existing lists as-is.
   }
 }
 
-function renderCreditEstimate(elId, estimate) {
-  const el = document.getElementById(elId);
+function renderCreditEstimate(root, estimate) {
+  const el = root.querySelector(".limit-estimate");
   if (!estimate) { el.textContent = ""; return; }
   if (!estimate.available) {
     el.textContent = "Est. credits: collecting data — " + estimate.points + "/" + estimate.points_needed + " points";
@@ -1037,7 +1156,7 @@ function renderModelTable(rows) {
   for (const r of rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="tname">${escapeHtml(r.model)}</td>
+      <td class="tname">${sourceBadgeHtml(r.source)}${escapeHtml(r.model)}</td>
       ${tokensCellHtml(r)}
       ${cacheCellHtml(r)}
       <td class="num cost">${fmtCost(r.cost)}</td>
@@ -1058,7 +1177,7 @@ function renderProjectTable(rows) {
   for (const r of rows) {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td class="tname" title="${escapeHtml(r.project)}">${escapeHtml(r.project)}</td>
+      <td class="tname" title="${escapeHtml(r.project)}">${sourceBadgeHtml(r.source)}${escapeHtml(r.project)}</td>
       <td class="num">${r.message_count}</td>
       ${tokensCellHtml(r)}
       ${cacheCellHtml(r)}
@@ -1086,7 +1205,7 @@ function renderSessionTable(tableId, rows, mode) {
     tr.innerHTML = `
       <td class="rank">${firstCol}</td>
       <td>
-        <div class="tname tname-hover">${escapeHtml(displayTitle)}</div>
+        <div class="tname tname-hover">${sourceBadgeHtml(r.source)}${escapeHtml(displayTitle)}</div>
         <div class="tsub">${subParts.filter(Boolean).map(escapeHtml).join(" · ")}</div>
         ${path ? `<div class="tsub-path" title="${escapeHtml(path)}">${escapeHtml(path)}</div>` : ""}
       </td>
@@ -1452,19 +1571,24 @@ document.getElementById("session-search-input").addEventListener("keydown", (e) 
 
 async function refresh() {
   try {
-    const res = await fetch("/api/usage", { cache: "no-store" });
+    const res = await fetch("/api/usage?source=" + encodeURIComponent(currentSource), { cache: "no-store" });
     const data = await res.json();
 
     const pricingNoteEl = document.getElementById("pricing-note");
-    if (data.pricing_last_verified) {
-      const verified = new Date(data.pricing_last_verified + "T00:00:00Z");
+    const pricingSources = currentSource === "all" ? ["claude", "codex"] : [currentSource];
+    const pricingParts = pricingSources.map(src => {
+      const p = (data.pricing || {})[src];
+      if (!p || !p.last_verified) return "";
+      const verified = new Date(p.last_verified + "T00:00:00Z");
       const daysAgo = Math.floor((Date.now() - verified.getTime()) / 86400000);
       const stale = daysAgo > 45;
-      pricingNoteEl.textContent = stale
-        ? ` Pricing last verified ${fmtDayFull(data.pricing_last_verified)} (${daysAgo}d ago) — may be outdated.`
-        : ` Pricing verified ${fmtDayFull(data.pricing_last_verified)}.`;
-      pricingNoteEl.classList.toggle("stale", stale);
-    }
+      const label = src === "codex" ? "Codex" : "Claude";
+      const text = stale
+        ? `${label} pricing last verified ${fmtDayFull(p.last_verified)} (${daysAgo}d ago) — may be outdated`
+        : `${label} pricing verified ${fmtDayFull(p.last_verified)}`;
+      return stale ? `<span class="pricing-unverified">${escapeHtml(text)}</span>` : escapeHtml(text);
+    }).filter(Boolean);
+    pricingNoteEl.innerHTML = pricingParts.length ? " " + pricingParts.join(" · ") + "." : "";
 
     document.getElementById("total-cost").textContent = fmtCost(data.totals.cost);
     document.getElementById("today-cost").textContent = fmtCostPrecise(data.today.cost);
@@ -1507,32 +1631,39 @@ document.getElementById("theme-toggle").addEventListener("click", () => {
   localStorage.setItem("claude-usage-theme", next);
 });
 
-document.getElementById("api-info-btn").addEventListener("click", () => {
-  const panel = document.getElementById("api-info-panel");
-  panel.hidden = !panel.hidden;
-});
+function wireSyncControls(source) {
+  document.getElementById(source + "-api-info-btn").addEventListener("click", () => {
+    const panel = document.getElementById(source + "-api-info-panel");
+    panel.hidden = !panel.hidden;
+  });
 
-document.getElementById("sync-now-btn").addEventListener("click", async () => {
-  const btn = document.getElementById("sync-now-btn");
-  btn.disabled = true;
-  const prevLabel = btn.textContent;
-  btn.textContent = "Syncing…";
-  try {
-    const res = await fetch("/api/remote-usage/poll", { method: "POST" });
-    const data = await res.json();
-    if (!res.ok || data.error || data.ok === false) {
-      throw new Error(data.error || "sync failed");
+  document.getElementById(source + "-sync-now-btn").addEventListener("click", async () => {
+    const btn = document.getElementById(source + "-sync-now-btn");
+    btn.disabled = true;
+    const prevLabel = btn.textContent;
+    btn.textContent = "Syncing…";
+    try {
+      const res = await fetch("/api/remote-usage/poll?source=" + source, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok || data.error || data.ok === false) {
+        throw new Error(data.error || "sync failed");
+      }
+      await refresh();
+    } catch (e) {
+      const statusEl = document.getElementById(source + "-remote-sync-status");
+      statusEl.textContent = "Sync failed: " + e;
+      statusEl.style.color = "var(--red)";
+    } finally {
+      btn.textContent = prevLabel;
+      btn.disabled = false;
     }
-    await refresh();
-  } catch (e) {
-    document.getElementById("remote-sync-status").textContent = "Sync failed: " + e;
-    document.getElementById("remote-sync-status").style.color = "var(--red)";
-  } finally {
-    btn.textContent = prevLabel;
-    btn.disabled = false;
-  }
-});
+  });
+}
 
+wireSyncControls("claude");
+wireSyncControls("codex");
+
+initSourceToggle();
 refresh();
 setInterval(refresh, REFRESH_MS);
 </script>

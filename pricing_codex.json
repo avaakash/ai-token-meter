@@ -1,0 +1,46 @@
+{
+  "last_verified": "2026-07-15",
+  "source": "OpenAI API pricing (developers.openai.com/api/docs/pricing)",
+  "tier_multipliers": {
+    "default": 1.0,
+    "standard": 1.0,
+    "flex": 0.5,
+    "batch": 0.5,
+    "priority": 2.0
+  },
+  "models": {
+    "gpt-5.4": [
+      {"from": null, "input": 2.50, "output": 15.00, "cached_input": 0.25}
+    ],
+    "gpt-5.4-mini": [
+      {"from": null, "input": 0.75, "output": 4.50, "cached_input": 0.075}
+    ],
+    "gpt-5.4-nano": [
+      {"from": null, "input": 0.20, "output": 1.25, "cached_input": 0.02}
+    ],
+    "gpt-5.4-pro": [
+      {"from": null, "input": 30.00, "output": 180.00, "cached_input": 30.00}
+    ],
+    "gpt-5.5": [
+      {"from": null, "input": 5.00, "output": 30.00, "cached_input": 0.50}
+    ],
+    "gpt-5.5-pro": [
+      {"from": null, "input": 30.00, "output": 180.00, "cached_input": 30.00}
+    ],
+    "gpt-5.6-sol": [
+      {"from": null, "input": 5.00, "output": 30.00, "cached_input": 0.50}
+    ],
+    "gpt-5.6-terra": [
+      {"from": null, "input": 2.50, "output": 15.00, "cached_input": 0.25}
+    ],
+    "gpt-5.6-luna": [
+      {"from": null, "input": 1.00, "output": 6.00, "cached_input": 0.10}
+    ]
+  },
+  "prefix_fallback": [
+    ["gpt-5.6", {"input": 5.00, "output": 30.00, "cached_input": 0.50}],
+    ["gpt-5.5", {"input": 5.00, "output": 30.00, "cached_input": 0.50}],
+    ["gpt-5.4", {"input": 2.50, "output": 15.00, "cached_input": 0.25}]
+  ],
+  "unknown_default": {"input": 5.00, "output": 30.00, "cached_input": 0.50}
+}
