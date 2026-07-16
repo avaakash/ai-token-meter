@@ -1118,7 +1118,7 @@ function renderDailyMaxStrip(card, weekRow) {
   `;
   const rowEl = el.querySelector(".pct-chip-row");
   weekRow.daily_max.forEach(d => {
-    const pct = d.max_percentage || 0;
+    const pct = d.latest_percentage || 0;
     const chip = document.createElement("div");
     chip.className = "pct-chip";
     chip.innerHTML = `

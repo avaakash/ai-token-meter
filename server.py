@@ -224,12 +224,20 @@ def init_db():
                 source TEXT NOT NULL,
                 window_start TEXT NOT NULL,
                 day TEXT NOT NULL,
-                max_percentage REAL NOT NULL,
+                latest_percentage REAL NOT NULL,
                 updated_at TEXT NOT NULL,
                 PRIMARY KEY (source, window_start, day)
             )
             """
         )
+        # Column used to store a running MAX across polls; renamed once the
+        # semantics changed to "latest observed reading" (see
+        # _upsert_weekly_daily_max) — Claude's weekly quota is a rolling
+        # 7-day window, so usage can legitimately decrease during the week,
+        # not just rise to a hard reset. Non-destructive, safe every startup.
+        existing_daily_pct_cols = {row[1] for row in conn.execute("PRAGMA table_info(weekly_daily_max_pct)").fetchall()}
+        if "max_percentage" in existing_daily_pct_cols and "latest_percentage" not in existing_daily_pct_cols:
+            conn.execute("ALTER TABLE weekly_daily_max_pct RENAME COLUMN max_percentage TO latest_percentage")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_day ON messages(day)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_model ON messages(model)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_project ON messages(project)")
@@ -743,7 +751,20 @@ def _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end,
     loop calling get_conn() per iteration leaks a file descriptor per call
     and can exhaust the process's fd limit (confirmed: backfilling 643
     historical rows this way crashed the dashboard under launchd's default
-    limit, which is far lower than an interactive shell's)."""
+    limit, which is far lower than an interactive shell's).
+
+    Stores the LATEST reading per day, not a running max — Claude's weekly
+    quota is a rolling 7-day window: usage from exactly 7 days ago ages off
+    continuously, so the percentage can legitimately go DOWN during the week,
+    not just rise until a hard reset (confirmed: observed 7% in the morning
+    drop to 4% by evening on the real API — a running max would have frozen
+    at 7% and never reflected that). The WHERE guard only lets a write
+    through if it's at least as recent as what's already stored — live polls
+    and the backfill replay both process rows chronologically already, so
+    this is a defensive backstop against an out-of-order call, not the
+    primary ordering mechanism — and it's also what makes replaying
+    (self-healing) old max-corrupted rows during a backfill converge on the
+    correct latest value instead of getting stuck on the inflated one."""
     window_start = _floor_window_key(window_start)
     window_end = _floor_window_key(window_end)
     day, _, _ = day_fields(observed_at)
@@ -758,11 +779,12 @@ def _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end,
     )
     conn.execute(
         """
-        INSERT INTO weekly_daily_max_pct (source, window_start, day, max_percentage, updated_at)
+        INSERT INTO weekly_daily_max_pct (source, window_start, day, latest_percentage, updated_at)
         VALUES (?, ?, ?, ?, ?)
         ON CONFLICT(source, window_start, day) DO UPDATE SET
-            max_percentage = MAX(max_percentage, excluded.max_percentage),
+            latest_percentage = excluded.latest_percentage,
             updated_at = excluded.updated_at
+        WHERE excluded.updated_at >= weekly_daily_max_pct.updated_at
         """,
         (source, window_start, day, percentage, observed_at),
     )
@@ -864,7 +886,7 @@ def list_weekly_usage(source=None, limit=20):
         for w in windows:
             days = conn.execute(
                 """
-                SELECT day, max_percentage, updated_at
+                SELECT day, latest_percentage, updated_at
                 FROM weekly_daily_max_pct
                 WHERE source = ? AND window_start = ?
                 ORDER BY day ASC
@@ -872,7 +894,7 @@ def list_weekly_usage(source=None, limit=20):
                 (w["source"], w["window_start"]),
             ).fetchall()
             daily_max = [
-                {"day": d["day"], "max_percentage": d["max_percentage"], "updated_at": d["updated_at"]}
+                {"day": d["day"], "latest_percentage": d["latest_percentage"], "updated_at": d["updated_at"]}
                 for d in days
             ]
             result.append({
@@ -881,11 +903,13 @@ def list_weekly_usage(source=None, limit=20):
                 "window_end": w["window_end"],
                 "created_at": w["created_at"],
                 "daily_max": daily_max,
-                # Utilization only rises within a window (it resets at window_end),
-                # so the week's overall peak is just the max of its daily maxes.
-                # None (not 0) when no reading was ever recorded for the week, so
-                # callers can distinguish "unused" from "unknown".
-                "week_max_percentage": max((d["max_percentage"] for d in daily_max), default=None),
+                # The rolling weekly quota can go up or down within a window
+                # (see _upsert_weekly_daily_max), so there's no single "peak"
+                # that represents the week — the most recent day's latest
+                # reading is the closest thing to "where usage currently
+                # stands" for that week. None (not 0) when nothing was ever
+                # recorded, so callers can distinguish "unused" from "unknown".
+                "week_max_percentage": daily_max[-1]["latest_percentage"] if daily_max else None,
             })
         return result
 
@@ -909,7 +933,7 @@ def get_weekly_usage_window(source, window_start):
             return None
         days = conn.execute(
             """
-            SELECT day, max_percentage, updated_at
+            SELECT day, latest_percentage, updated_at
             FROM weekly_daily_max_pct
             WHERE source = ? AND window_start = ?
             ORDER BY day ASC
@@ -917,7 +941,7 @@ def get_weekly_usage_window(source, window_start):
             (source, window_start),
         ).fetchall()
         daily_max = [
-            {"day": d["day"], "max_percentage": d["max_percentage"], "updated_at": d["updated_at"]}
+            {"day": d["day"], "latest_percentage": d["latest_percentage"], "updated_at": d["updated_at"]}
             for d in days
         ]
         return {
@@ -926,7 +950,7 @@ def get_weekly_usage_window(source, window_start):
             "window_end": w["window_end"],
             "created_at": w["created_at"],
             "daily_max": daily_max,
-            "week_max_percentage": max((d["max_percentage"] for d in daily_max), default=None),
+            "week_max_percentage": daily_max[-1]["latest_percentage"] if daily_max else None,
         }
 
 
