@@ -162,10 +162,22 @@ def init_db():
                 path TEXT PRIMARY KEY,
                 mtime REAL,
                 size INTEGER,
-                offset INTEGER
+                offset INTEGER,
+                carry_model TEXT,
+                carry_service_tier TEXT,
+                carry_session_id TEXT,
+                carry_cwd TEXT
             )
             """
         )
+        # carry_* columns were added after the initial release — backfill them
+        # onto any file_state table created before that (codex.py needs them to
+        # remember model/session/cwd across incremental scans of the same file;
+        # see scan_file() there for why).
+        existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(file_state)")}
+        for col in ("carry_model", "carry_service_tier", "carry_session_id", "carry_cwd"):
+            if col not in existing_cols:
+                conn.execute(f"ALTER TABLE file_state ADD COLUMN {col} TEXT")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS session_titles (
@@ -256,9 +268,16 @@ def init_db():
 def scan_all():
     with _db_lock:
         with get_conn() as conn:
-            cur = conn.execute("SELECT path, mtime, size, offset FROM file_state")
+            cur = conn.execute(
+                "SELECT path, mtime, size, offset, carry_model, carry_service_tier, "
+                "carry_session_id, carry_cwd FROM file_state"
+            )
             state = {
-                row[0]: {"mtime": row[1], "size": row[2], "offset": row[3]}
+                row[0]: {
+                    "mtime": row[1], "size": row[2], "offset": row[3],
+                    "carry_model": row[4], "carry_service_tier": row[5],
+                    "carry_session_id": row[6], "carry_cwd": row[7],
+                }
                 for row in cur.fetchall()
             }
             for module in SOURCES.values():
@@ -267,7 +286,13 @@ def scan_all():
                         module.scan_file(conn, path, state)
             ensure_day_fields_current(conn)
             ensure_project_field_current(conn)
-            ensure_pricing_current(conn)
+            # Full pricing-hash-triggered recompute only happens at startup
+            # (see main()) — it walks every row and would make whichever
+            # request first observes a changed pricing file pay for a full
+            # table recompute. Here we only backfill rows that have no cost
+            # at all yet (should be ~0 in steady state; scan_file() computes
+            # cost for rows it inserts), so page loads stay cheap.
+            recompute_missing_costs(conn)
             conn.commit()
 
 
@@ -277,14 +302,28 @@ def recompute_all_costs(conn):
     file access needed. Safe to run any time a pricing file changes: each
     message re-resolves its own rate period from its own timestamp, so
     historical amounts only change if the rate period that actually applied
-    to them changed."""
+    to them changed. Expensive (walks every row) — call only at startup, via
+    ensure_pricing_current(); never from the per-request scan_all() path."""
+    _recompute_costs(conn, where_sql="")
+
+
+def recompute_missing_costs(conn):
+    """Cheap per-request counterpart to recompute_all_costs(): only touches
+    rows that have never been priced (cost_cache_read IS NULL). Safe to call
+    on every scan_all() — normally a no-op since scan_file() prices rows as
+    it inserts them."""
+    _recompute_costs(conn, where_sql="WHERE cost_cache_read IS NULL")
+
+
+def _recompute_costs(conn, where_sql):
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        """
+        f"""
         SELECT message_id, source, model, timestamp, input_tokens, output_tokens,
                cache_read_tokens, cache_5m_tokens, cache_1h_tokens,
                reasoning_output_tokens, service_tier
         FROM messages
+        {where_sql}
         """
     ).fetchall()
     updates = []
@@ -311,6 +350,10 @@ def recompute_all_costs(conn):
 
 
 def ensure_pricing_current(conn):
+    """Startup-only: full recompute of every row's cost when either pricing
+    file's content has changed since last run, or a stray null cost slipped
+    through. Called once from main() before the server starts serving —
+    never from scan_all(), which would make it a per-request cost."""
     combined_hash = hashlib.sha256(
         "".join(m.pricing_file_hash() for m in SOURCES.values()).encode()
     ).hexdigest()
@@ -743,6 +786,47 @@ def _validate_percentage(percentage):
     return percentage
 
 
+def _resolve_weekly_window_key(conn, source, window_start, window_end):
+    """Returns the window_start to actually file this reading under. If the
+    most recently tracked window for `source` started within half a period
+    of this reading's own reported window_start, treat it as the SAME window
+    (return the existing key) instead of starting a new row.
+
+    Confirmed empirically: Claude's weekly reset sits on a fixed calendar
+    grid (resets_at holds steady for days, then jumps a full ~7 days at the
+    real boundary) — normal jitter there is sub-minute, already collapsed by
+    _floor_window_key, so this rarely even needs to kick in. Codex's is
+    different: its resets_at is recomputed fresh every single poll (~7 days
+    from *now*, not from a fixed anchor), so window_start creeps forward by
+    exactly the ~10-minute poll interval every time — with no merge logic
+    that fragments into one near-duplicate weekly_windows row per poll
+    (confirmed: 26 rows accumulated in about a day). Since there's no real
+    weekly cycle to align to for a source like that, this collapses it into
+    one continuously-extending "current" entry instead — the honest
+    representation, and what keeps historical-week comparisons meaningful
+    for sources that DO have real cycles."""
+    latest = conn.execute(
+        """
+        SELECT window_start, window_end FROM weekly_windows
+        WHERE source = ? ORDER BY window_start DESC LIMIT 1
+        """,
+        (source,),
+    ).fetchone()
+    if latest is None:
+        return window_start
+
+    latest_start = _parse_ts(latest["window_start"])
+    new_start = _parse_ts(window_start)
+    new_end = _parse_ts(window_end)
+    if latest_start is None or new_start is None or new_end is None:
+        return window_start
+
+    period = new_end - new_start
+    if abs(new_start - latest_start) <= period / 2:
+        return latest["window_start"]
+    return window_start
+
+
 def _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end, observed_at):
     """Write half of record_weekly_daily_max, taking an already-open `conn`
     so callers doing many writes (backfill_weekly_usage_from_snapshots) can
@@ -753,29 +837,32 @@ def _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end,
     historical rows this way crashed the dashboard under launchd's default
     limit, which is far lower than an interactive shell's).
 
-    Stores the LATEST reading per day, not a running max — Claude's weekly
-    quota is a rolling 7-day window: usage from exactly 7 days ago ages off
-    continuously, so the percentage can legitimately go DOWN during the week,
-    not just rise until a hard reset (confirmed: observed 7% in the morning
-    drop to 4% by evening on the real API — a running max would have frozen
-    at 7% and never reflected that). The WHERE guard only lets a write
-    through if it's at least as recent as what's already stored — live polls
-    and the backfill replay both process rows chronologically already, so
-    this is a defensive backstop against an out-of-order call, not the
-    primary ordering mechanism — and it's also what makes replaying
-    (self-healing) old max-corrupted rows during a backfill converge on the
-    correct latest value instead of getting stuck on the inflated one."""
+    Stores the LATEST reading per day, not a running max: usage can
+    legitimately go DOWN within a window, not just rise until a reset
+    (confirmed on Claude: observed 7% in the morning drop to 4% by evening
+    within the same fixed window — a running max would have frozen at 7%
+    and never reflected that). The WHERE guard only lets a write through if
+    it's at least as recent as what's already stored — live polls and the
+    backfill replay both process rows chronologically already, so this is a
+    defensive backstop against an out-of-order call, not the primary
+    ordering mechanism — and it's also what makes replaying (self-healing)
+    old max-corrupted rows during a backfill converge on the correct latest
+    value instead of getting stuck on the inflated one."""
     window_start = _floor_window_key(window_start)
     window_end = _floor_window_key(window_end)
     day, _, _ = day_fields(observed_at)
+
+    effective_start = _resolve_weekly_window_key(conn, source, window_start, window_end)
 
     conn.execute(
         """
         INSERT INTO weekly_windows (source, window_start, window_end, created_at)
         VALUES (?, ?, ?, ?)
-        ON CONFLICT(source, window_start) DO NOTHING
+        ON CONFLICT(source, window_start) DO UPDATE SET
+            window_end = excluded.window_end
+        WHERE excluded.window_end > weekly_windows.window_end
         """,
-        (source, window_start, window_end, observed_at),
+        (source, effective_start, window_end, observed_at),
     )
     conn.execute(
         """
@@ -786,7 +873,7 @@ def _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end,
             updated_at = excluded.updated_at
         WHERE excluded.updated_at >= weekly_daily_max_pct.updated_at
         """,
-        (source, window_start, day, percentage, observed_at),
+        (source, effective_start, day, percentage, observed_at),
     )
 
 
@@ -811,6 +898,7 @@ def record_weekly_daily_max(source, percentage, window_start, window_end, observ
     with _db_lock:
         conn = get_conn()
         try:
+            conn.row_factory = sqlite3.Row
             _upsert_weekly_daily_max(conn, source, percentage, window_start, window_end, observed_at)
             conn.commit()
         finally:
@@ -952,6 +1040,132 @@ def get_weekly_usage_window(source, window_start):
             "daily_max": daily_max,
             "week_max_percentage": daily_max[-1]["latest_percentage"] if daily_max else None,
         }
+
+
+MIN_COMPLETED_WEEKS_FOR_HISTORY = 3
+MIN_CURRENT_WEEK_DAYS_FOR_PACE = 2
+MIN_ELAPSED_HOURS_FOR_PACE = 18
+
+
+def predict_weekly_usage(source):
+    """Predict how much of the weekly limit % a source is on track to use,
+    built entirely from Anthropic's/OpenAI's own polled percentage history
+    (weekly_daily_max_pct) — never from local $ cost, which only sees this
+    machine's CLI activity and would silently undercount any other surface
+    (e.g. Claude web chat, Cowork) that doesn't write local logs but does
+    count against the same account-wide quota.
+
+    Two independent signals, both gated on a minimum amount of data so an
+    early/noisy reading never gets reported as a confident number:
+
+      - historical_avg_percentage: once >= MIN_COMPLETED_WEEKS_FOR_HISTORY
+        full weeks have been observed, the average of each week's final
+        (most recent) reading — "how much you typically end up using."
+      - pace_projection_percentage: the current in-progress week's latest
+        reading scaled up by how much of the 7-day window has elapsed so
+        far — "at this rate, you'd end up around X% for the week."
+        Requires both a minimum number of distinct days observed AND a
+        minimum elapsed time, since scaling up a reading from just a few
+        hours into the window would wildly overreact to normal noise.
+
+    Neither is a guess when data is thin: both are None (not 0 or a wild
+    number) until their own minimum is met."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        windows = conn.execute(
+            """
+            SELECT window_start, window_end FROM weekly_windows
+            WHERE source = ? ORDER BY window_start DESC
+            """,
+            (source,),
+        ).fetchall()
+
+        if not windows:
+            return {
+                "available": False,
+                "historical_avg_percentage": None,
+                "historical_weeks_used": 0,
+                "historical_weeks_needed": MIN_COMPLETED_WEEKS_FOR_HISTORY,
+                "pace_projection_percentage": None,
+                "current_percentage": None,
+                "current_window_start": None,
+                "current_window_end": None,
+            }
+
+        now = datetime.now(timezone.utc)
+
+        # The one window (if any) still in progress; everything else has
+        # fully played out and is eligible for the historical average.
+        current = None
+        completed = []
+        for w in windows:
+            w_end = _parse_ts(w["window_end"])
+            if current is None and w_end is not None and w_end > now:
+                current = w
+            else:
+                completed.append(w)
+
+        historical_finals = []
+        for w in completed:
+            row = conn.execute(
+                """
+                SELECT latest_percentage FROM weekly_daily_max_pct
+                WHERE source = ? AND window_start = ?
+                ORDER BY day DESC LIMIT 1
+                """,
+                (source, w["window_start"]),
+            ).fetchone()
+            if row is not None:
+                historical_finals.append(row["latest_percentage"])
+
+        historical_avg = (
+            sum(historical_finals) / len(historical_finals)
+            if len(historical_finals) >= MIN_COMPLETED_WEEKS_FOR_HISTORY
+            else None
+        )
+
+        pace_projection = None
+        current_percentage = None
+        current_window_start = current["window_start"] if current else None
+        current_window_end = current["window_end"] if current else None
+
+        if current is not None:
+            current_days = conn.execute(
+                """
+                SELECT day, latest_percentage FROM weekly_daily_max_pct
+                WHERE source = ? AND window_start = ? ORDER BY day ASC
+                """,
+                (source, current["window_start"]),
+            ).fetchall()
+
+            if current_days:
+                current_percentage = current_days[-1]["latest_percentage"]
+                current_start = _parse_ts(current["window_start"])
+                current_end = _parse_ts(current["window_end"])
+                if current_start is not None and current_end is not None:
+                    elapsed = (now - current_start).total_seconds()
+                    total = (current_end - current_start).total_seconds()
+                    elapsed_hours = elapsed / 3600.0
+                    if (
+                        len(current_days) >= MIN_CURRENT_WEEK_DAYS_FOR_PACE
+                        and elapsed_hours >= MIN_ELAPSED_HOURS_FOR_PACE
+                        and elapsed > 0
+                    ):
+                        pace_projection = min(100.0, current_percentage / elapsed * total)
+
+    return {
+        "available": historical_avg is not None or pace_projection is not None,
+        "historical_avg_percentage": historical_avg,
+        "historical_weeks_used": len(historical_finals),
+        "historical_weeks_needed": MIN_COMPLETED_WEEKS_FOR_HISTORY,
+        "pace_projection_percentage": pace_projection,
+        "current_percentage": current_percentage,
+        "current_window_start": current_window_start,
+        "current_window_end": current_window_end,
+    }
 
 
 def delete_weekly_usage_window(source, window_start):
@@ -1391,7 +1605,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 limit = int(qs.get("limit", ["20"])[0])
             except ValueError:
                 limit = 20
-            self._send_json_result(lambda: {"weeks": list_weekly_usage(source, limit)})
+
+            def build_weekly_usage_response():
+                result = {"weeks": list_weekly_usage(source, limit)}
+                if source:
+                    result["prediction"] = predict_weekly_usage(source)
+                return result
+
+            self._send_json_result(build_weekly_usage_response)
         else:
             self.send_response(404)
             self.end_headers()
@@ -1460,6 +1681,10 @@ def main():
     init_db()
     for source in SOURCES:
         backfill_weekly_usage_from_snapshots(source)
+    with _db_lock:
+        with get_conn() as conn:
+            ensure_pricing_current(conn)  # full recompute if pricing files changed since last run
+            conn.commit()
     scan_all()  # warm the cache before first request
     for module in SOURCES.values():
         if hasattr(module, "start_background_poll"):

@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import threading
 import time
+import traceback
 from datetime import datetime, timedelta, timezone
 
 import server
@@ -160,19 +161,51 @@ def scan_file(conn, path, state):
     mtime, size = stat.st_mtime, stat.st_size
     prev = state.get(path)
 
+    # Codex archives finished sessions — moves them from sessions/**/*.jsonl
+    # to archived_sessions/<basename> — some time after they're last scanned.
+    # Without this, the archived path looks like a brand-new file (no
+    # file_state row) and gets re-read from offset 0, inserting a second
+    # full copy of every row already recorded under the old path. Detect the
+    # move by basename and adopt the old row (offset, carry state) instead;
+    # the stale old-path row is deleted once the rename is persisted below.
+    renamed_from = None
+    if prev is None:
+        codex_root = os.path.join(HOME, ".codex") + os.sep
+        basename = os.path.basename(path)
+        for other_path, other_info in state.items():
+            if other_path != path and other_path.startswith(codex_root) \
+                    and os.path.basename(other_path) == basename \
+                    and not os.path.exists(other_path):
+                prev, renamed_from = other_info, other_path
+                break
+
     if prev and prev["mtime"] == mtime and prev["size"] == size:
+        if renamed_from:
+            _persist_rename(conn, path, mtime, size, prev, renamed_from)
         return  # unchanged
 
     offset = prev["offset"] if prev else 0
-    if prev and size < prev["size"]:
+    truncated = prev and size < prev["size"]
+    if truncated:
         offset = 0  # file was truncated/rewritten; re-read from scratch
 
+    # Model/session/cwd are carried by records seen earlier in the file, not
+    # on every line — when the file is re-scanned from a mid-file offset (the
+    # common case: this function is called on every dashboard load, resuming
+    # from wherever the last scan left off), a token_count event can appear
+    # before this call has seen any turn_context/thread_settings_applied/
+    # session_meta of its own. Seed from what the previous scan of this same
+    # file last resolved, so those events don't fall back to "unknown" —
+    # unless the file was truncated/rewritten, in which case that carried
+    # state describes content that's gone and must not leak into the new
+    # content's rows.
+    carry = prev if (prev and not truncated) else None
     new_rows = []
     new_offset = offset
-    session_id = None
-    current_cwd = None
-    current_model = None
-    current_service_tier = "default"
+    session_id = carry["carry_session_id"] if carry else None
+    current_cwd = carry["carry_cwd"] if carry else None
+    current_model = carry["carry_model"] if carry else None
+    current_service_tier = (carry["carry_service_tier"] if carry else None) or "default"
     latest_rate_limits = None
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -292,10 +325,29 @@ def scan_file(conn, path, state):
     if latest_rate_limits is not None:
         _store_rate_limits(conn, latest_rate_limits, origin="log")
 
-    conn.execute(
-        "INSERT OR REPLACE INTO file_state (path, mtime, size, offset) VALUES (?, ?, ?, ?)",
-        (path, mtime, size, new_offset),
+    _persist_rename(
+        conn, path, mtime, size,
+        {"offset": new_offset, "carry_model": current_model, "carry_service_tier": current_service_tier,
+         "carry_session_id": session_id, "carry_cwd": current_cwd},
+        renamed_from,
     )
+
+
+def _persist_rename(conn, path, mtime, size, info, renamed_from):
+    """Write path's file_state row from `info` (offset + carry_*), and if this
+    call resolved a sessions/ -> archived_sessions/ move, drop the old path's
+    now-stale row so it can't be mistaken for a rename source again."""
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO file_state
+        (path, mtime, size, offset, carry_model, carry_service_tier, carry_session_id, carry_cwd)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (path, mtime, size, info["offset"], info["carry_model"], info["carry_service_tier"],
+         info["carry_session_id"], info["carry_cwd"]),
+    )
+    if renamed_from:
+        conn.execute("DELETE FROM file_state WHERE path = ?", (renamed_from,))
 
 
 # ---------------------------------------------------------------------------
@@ -603,16 +655,37 @@ def poll_remote_usage_once():
     if weekly_pct is not None:
         snapshot = server.create_limit_snapshot(SOURCE_NAME, "weekly", weekly_pct)
         if snapshot.get("saved"):
-            server.record_weekly_daily_max(
-                SOURCE_NAME, weekly_pct, snapshot["window_start"], snapshot["window_end"], snapshot["created_at"]
-            )
+            # The core poll above has already succeeded and committed by this
+            # point — a bug in this secondary daily-max tracking must never
+            # turn the whole poll into a reported failure (confirmed: it
+            # silently killed the background poll thread entirely, since
+            # nothing here caught it, and made "Sync now" always report
+            # failure to the UI even though the real percentage had already
+            # updated). Deliberately NOT routed through
+            # _record_remote_usage_error — that field drives the "sync
+            # failed" status the UI shows, and the actual sync did succeed
+            # here; just log it for later debugging.
+            try:
+                server.record_weekly_daily_max(
+                    SOURCE_NAME, weekly_pct, snapshot["window_start"], snapshot["window_end"], snapshot["created_at"]
+                )
+            except Exception:
+                traceback.print_exc()
 
     return {"ok": True}
 
 
 def _remote_usage_poll_loop():
     while True:
-        poll_remote_usage_once()
+        try:
+            poll_remote_usage_once()
+        except Exception:
+            # Backstop: an uncaught exception here would silently kill this
+            # daemon thread forever (confirmed — that's exactly what
+            # happened), with no further polling and no visible symptom
+            # beyond a slowly staling "last synced" time. Log and keep going
+            # rather than let one bad poll end all future polling.
+            traceback.print_exc()
         time.sleep(REMOTE_USAGE_POLL_SECONDS)
 
 

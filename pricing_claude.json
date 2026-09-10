@@ -1,5 +1,5 @@
 {
-  "last_verified": "2026-07-02",
+  "last_verified": "2026-09-10",
   "source": "Anthropic API pricing (platform.claude.com/docs/en/pricing), via the claude-api skill",
   "models": {
     "claude-fable-5": [
@@ -30,8 +30,7 @@
       {"from": null, "input": 15.00, "output": 75.00}
     ],
     "claude-sonnet-5": [
-      {"from": null, "input": 2.00, "output": 10.00},
-      {"from": "2026-09-01", "input": 3.00, "output": 15.00}
+      {"from": null, "input": 2.00, "output": 10.00}
     ],
     "claude-sonnet-4-6": [
       {"from": null, "input": 3.00, "output": 15.00}

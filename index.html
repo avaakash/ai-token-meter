@@ -245,6 +245,8 @@
   .limit-usage-cols { display: flex; gap: 16px; margin-top: 14px; }
   .limit-usage-cols > div { flex: 1; min-width: 0; }
   @media (max-width: 480px) { .limit-usage-cols { flex-direction: column; gap: 10px; } }
+  .limit-prediction { margin-top: 10px !important; border-bottom: 1px dashed var(--border); display: inline-block; cursor: default; }
+  .limit-prediction:empty { display: none; }
   .limit-daily-max-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: 6px; }
   .limit-daily-max-empty { color: var(--muted); font-size: 11.5px; }
 
@@ -259,13 +261,16 @@
   .pct-chip-value { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
   .pct-chip.pct-chip-empty .pct-chip-value { color: var(--muted); font-weight: 500; }
 
-  /* ---------- Quota alarms ---------- */
+  /* ---------- Quota banners ---------- */
   .alarm-banner {
     display: flex; align-items: center; gap: 10px;
-    background: rgba(248,113,113,0.12); border: 1px solid var(--red);
     border-radius: 10px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: var(--text);
+    border: 1px solid var(--border); background: var(--card-alt);
   }
   .alarm-banner .alarm-icon { font-size: 16px; flex-shrink: 0; }
+  .alarm-banner.sev-urgent { background: rgba(248,113,113,0.12); border-color: var(--red); }
+  .alarm-banner.sev-warning { background: rgba(217,119,87,0.12); border-color: var(--accent); }
+  .alarm-banner.sev-info { background: rgba(110,168,254,0.12); border-color: var(--accent2); }
 
 
   /* ---------- Search ---------- */
@@ -975,7 +980,8 @@ function buildLimitCardEl(label) {
 }
 
 // Weekly-only: daily usage (left) and last-7-weeks usage (right), side by
-// side — inserted only into the weekly card, not the 5-hour one.
+// side, plus a predicted-usage line below — inserted only into the weekly
+// card, not the 5-hour one.
 function addUsageColsToWeeklyCard(card) {
   const cols = document.createElement("div");
   cols.className = "limit-usage-cols";
@@ -983,7 +989,12 @@ function addUsageColsToWeeklyCard(card) {
     <div class="limit-daily-max"></div>
     <div class="limit-weekly-max"></div>
   `;
-  card.insertBefore(cols, card.querySelector(".limit-log"));
+  const logEl = card.querySelector(".limit-log");
+  card.insertBefore(cols, logEl);
+
+  const prediction = document.createElement("div");
+  prediction.className = "sub limit-prediction";
+  card.insertBefore(prediction, logEl);
 }
 
 function renderOneLimitCard(card, windowData, sourceLabel, bucketLabelFn, prevLabel) {
@@ -1170,58 +1181,178 @@ function renderWeeklyMaxCol(card, weeks) {
   });
 }
 
-async function refreshWeeklyUsage() {
+function renderWeeklyPrediction(card, prediction) {
+  const el = card.querySelector(".limit-prediction");
+  if (!el) return;
+  if (!prediction) { el.textContent = ""; return; }
+
+  const { historical_avg_percentage, pace_projection_percentage, historical_weeks_used, historical_weeks_needed } = prediction;
+
+  if (historical_avg_percentage != null) {
+    let text = "Typically ~" + Math.round(historical_avg_percentage) + "%/week";
+    if (pace_projection_percentage != null) {
+      text += " · trending toward ~" + Math.round(pace_projection_percentage) + "% this week";
+    }
+    el.textContent = text;
+  } else if (pace_projection_percentage != null) {
+    el.textContent = "At this pace, ~" + Math.round(pace_projection_percentage) + "% this week";
+  } else if (historical_weeks_used != null) {
+    el.textContent = "Predicting weekly usage — collecting data (" + historical_weeks_used + "/" + historical_weeks_needed + " weeks tracked)";
+  } else {
+    el.textContent = "";
+    return;
+  }
+
+  attachTooltip(el, () => `
+    <div class="tt-title">How this is predicted</div>
+    <div class="tt-row">Built only from the remote-reported % history —</div>
+    <div class="tt-row">never from local $ cost, which misses web chat / Cowork.</div>
+    <div class="tt-row" style="margin-top:4px;">"Typically" = average of completed weeks' final reading.</div>
+    <div class="tt-row">"At this pace" = current reading scaled up by elapsed time.</div>
+  `);
+}
+
+async function refreshWeeklyUsage(limits) {
   const sources = currentSource === "all" ? ["claude", "codex"] : [currentSource];
+  const banners = [];
+
   for (const src of sources) {
+    const label = src === "codex" ? "Codex" : "Claude";
+    const sourceLimits = limits && limits[src];
+    banners.push(...computeFiveHourBanners(label, sourceLimits && sourceLimits.five_hour));
+
     const cards = limitCardRefs[src];
     if (!cards || !cards.weekly) continue;
     let weeks = [];
+    let prediction = null;
     try {
       const res = await fetch("/api/weekly-usage?source=" + src + "&limit=7", { cache: "no-store" });
       const data = await res.json();
       weeks = data.weeks || [];
+      prediction = data.prediction || null;
     } catch (e) {
       // Non-critical — leave the card's existing columns as-is.
     }
     renderDailyMaxStrip(cards.weekly, weeks[0] || null);
     renderWeeklyMaxCol(cards.weekly, weeks);
+    renderWeeklyPrediction(cards.weekly, prediction);
+
+    banners.push(...computeWeeklyBanners(label, sourceLimits && sourceLimits.weekly, prediction));
   }
+
+  renderQuotaBanners(banners);
 }
 
-/* ---------- Quota alarms: reset approaching but quota barely touched ---------- */
-const ALARM_HOURS_LEFT = 24;
-const ALARM_MAX_PCT = 50;
+/* ---------- Quota banners: pace vs. reset time, both directions ----------
+   Two independent checks per source:
+     - 5-hour window: only a "too fast, may hit the cap" signal — the window
+       is short enough that an "underused" nudge wouldn't be actionable.
+     - Weekly window: "too fast" (projected to exceed the quota before
+       reset, or already high with reset imminent), "too slow with reset
+       imminent" (use-it-or-lose-it), and — once enough history exists —
+       "slower/faster than your own typical week" as a lower-urgency FYI.
+   All read-only computations; the DOM write is renderQuotaBanners(). */
 
-function weeklyUsedPercent(weeklyWindow) {
-  if (weeklyWindow.remote_pct != null) return weeklyWindow.remote_pct;
-  const est = weeklyWindow.credit_estimate;
+const FIVE_HOUR_HIGH_PCT = 85;
+const FIVE_HOUR_MIN_SECONDS_LEFT = 900; // 15 min — enough time left to still matter
+
+const WEEKLY_AT_RISK_PCT = 92;   // too fast: pace/current exceeds this
+const WEEKLY_SLOW_PCT = 75;      // too slow: pace/current does not exceed this
+const WEEKLY_SLOW_VS_TYPICAL_RATIO = 0.5;  // pace under half of typical
+const WEEKLY_FAST_VS_TYPICAL_RATIO = 1.5;  // pace over 1.5x typical
+
+function windowUsedPercent(window) {
+  if (!window) return null;
+  if (window.remote_pct != null) return window.remote_pct;
+  const est = window.credit_estimate;
   if (est && est.available && est.current_pct != null) return est.current_pct;
   return null; // no way to know usage % without remote data or enough estimate history
 }
 
-function renderQuotaAlarms(limits) {
-  const el = document.getElementById("quota-alarms");
-  if (!limits) { el.innerHTML = ""; return; }
+function computeFiveHourBanners(label, fiveHourWindow) {
+  const banners = [];
+  if (!fiveHourWindow || fiveHourWindow.seconds_remaining == null) return banners;
+  const pct = windowUsedPercent(fiveHourWindow);
+  if (pct == null) return banners;
+  if (pct >= FIVE_HOUR_HIGH_PCT && fiveHourWindow.seconds_remaining >= FIVE_HOUR_MIN_SECONDS_LEFT) {
+    banners.push({
+      severity: "urgent",
+      icon: "🔥",
+      html: `<b>${escapeHtml(label)}</b> 5-hour session is at <b>${Math.round(pct)}%</b> with `
+        + `<b>${fmtDuration(fiveHourWindow.seconds_remaining)}</b> left before it resets — going too fast, you may hit the limit before then.`,
+    });
+  }
+  return banners;
+}
 
-  const sources = [];
-  if (currentSource === "all" || currentSource === "claude") sources.push(["Claude", limits.claude]);
-  if (currentSource === "all" || currentSource === "codex") sources.push(["Codex", limits.codex]);
+function computeWeeklyBanners(label, weeklyWindow, prediction) {
+  const banners = [];
+  if (!weeklyWindow || weeklyWindow.seconds_remaining == null) return banners;
 
-  const alarms = [];
-  for (const [label, sourceLimits] of sources) {
-    const weeklyWindow = sourceLimits && sourceLimits.weekly;
-    if (!weeklyWindow || weeklyWindow.seconds_remaining == null) continue;
-    if (weeklyWindow.seconds_remaining > ALARM_HOURS_LEFT * 3600) continue;
-    const pct = weeklyUsedPercent(weeklyWindow);
-    if (pct == null || pct >= ALARM_MAX_PCT) continue;
-    alarms.push({ label, pct, secondsRemaining: weeklyWindow.seconds_remaining });
+  const currentPct = windowUsedPercent(weeklyWindow);
+  const pace = prediction ? prediction.pace_projection_percentage : null;
+  const historicalAvg = prediction ? prediction.historical_avg_percentage : null;
+
+  const periodSeconds = (new Date(weeklyWindow.window_end) - new Date(weeklyWindow.window_start)) / 1000;
+  const pastHalfway = periodSeconds > 0 && weeklyWindow.seconds_remaining <= periodSeconds / 2;
+
+  // Too fast: on track to exceed the weekly quota (or already very high) before reset.
+  const trendValue = pace != null ? pace : currentPct;
+  const projectedHigh = trendValue != null && trendValue > WEEKLY_AT_RISK_PCT;
+  if (projectedHigh) {
+    banners.push({
+      severity: "urgent",
+      icon: "🔥",
+      html: pace != null
+        ? `<b>${escapeHtml(label)}</b> is going too fast — on pace to use its full weekly quota before it resets in `
+          + `<b>${fmtDuration(weeklyWindow.seconds_remaining)}</b> (projected ~<b>${Math.round(pace)}%</b>).`
+        : `<b>${escapeHtml(label)}</b> has already used <b>${Math.round(currentPct)}%</b> of its weekly quota with `
+          + `<b>${fmtDuration(weeklyWindow.seconds_remaining)}</b> left until reset.`,
+    });
+  } else if (pastHalfway && trendValue != null && trendValue <= WEEKLY_SLOW_PCT) {
+    // Too slow: past the halfway point of the week and well under the risk
+    // threshold — plenty of headroom, not just a last-24h nudge. Between
+    // WEEKLY_SLOW_PCT and WEEKLY_AT_RISK_PCT is a comfortable zone — no banner.
+    banners.push({
+      severity: "warning",
+      icon: "🐢",
+      html: pace != null
+        ? `<b>${escapeHtml(label)}</b> weekly quota resets in <b>${fmtDuration(weeklyWindow.seconds_remaining)}</b> — trending toward only `
+          + `~<b>${Math.round(pace)}%</b> by then. Going too slow — plenty of headroom to use more.`
+        : `<b>${escapeHtml(label)}</b> weekly quota resets in <b>${fmtDuration(weeklyWindow.seconds_remaining)}</b> — only `
+          + `<b>${Math.round(currentPct)}%</b> used so far. Going too slow — plenty of headroom to use more.`,
+    });
   }
 
-  el.innerHTML = alarms.map(a => `
-    <div class="alarm-banner">
-      <span class="alarm-icon">⚠️</span>
-      <span><b>${escapeHtml(a.label)}</b> weekly quota resets in <b>${fmtDuration(a.secondsRemaining)}</b> —
-      only <b>${a.pct.toFixed(0)}%</b> used so far. Make the most of it before it resets.</span>
+  // Lower-urgency FYI vs. your own typical week — only in the first half, before
+  // the broader too-fast/too-slow checks above already cover the back half.
+  if (!pastHalfway && historicalAvg != null && pace != null) {
+    if (pace < historicalAvg * WEEKLY_SLOW_VS_TYPICAL_RATIO) {
+      banners.push({
+        severity: "info",
+        icon: "🐢",
+        html: `<b>${escapeHtml(label)}</b> is trending toward ~<b>${Math.round(pace)}%</b> this week, well below your typical `
+          + `~<b>${Math.round(historicalAvg)}%</b>/week — plenty of headroom if you want to use it more.`,
+      });
+    } else if (pace > historicalAvg * WEEKLY_FAST_VS_TYPICAL_RATIO && pace < WEEKLY_AT_RISK_PCT) {
+      banners.push({
+        severity: "warning",
+        icon: "🔥",
+        html: `<b>${escapeHtml(label)}</b> is trending toward ~<b>${Math.round(pace)}%</b> this week, faster than your typical `
+          + `~<b>${Math.round(historicalAvg)}%</b>/week.`,
+      });
+    }
+  }
+
+  return banners;
+}
+
+function renderQuotaBanners(banners) {
+  const el = document.getElementById("quota-alarms");
+  el.innerHTML = banners.map(b => `
+    <div class="alarm-banner sev-${b.severity}">
+      <span class="alarm-icon">${b.icon}</span>
+      <span>${b.html}</span>
     </div>
   `).join("");
 }
@@ -1779,9 +1910,8 @@ async function refresh() {
     document.getElementById("total-messages").textContent = fmtNum(data.totals.message_count);
 
     renderLimits(data.limits);
-    renderQuotaAlarms(data.limits);
     refreshLimitLogs();
-    refreshWeeklyUsage();
+    refreshWeeklyUsage(data.limits);
     renderEfficiency(data);
     renderModelTable(data.by_model);
     renderSessionTable("top-session-table", data.top_sessions || [], "rank");

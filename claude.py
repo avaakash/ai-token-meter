@@ -10,6 +10,7 @@ import os
 import subprocess
 import threading
 import time
+import traceback
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -317,10 +318,17 @@ def scan_file(conn, path, state):
 IST = timezone(timedelta(hours=5, minutes=30))
 
 # Weekly limit: Anthropic resets this on a fixed 7-day clock (confirmed
-# boundary: Thursday 15:30 IST), independent of usage. Period is exactly 7
-# days, so ANY Thursday 15:30 IST lands on the same grid as any other — the
-# calendar date of the anchor below is arbitrary, only the weekday/time matter.
-WEEKLY_ANCHOR = datetime(2024, 1, 4, 15, 30, tzinfo=IST)  # a Thursday
+# boundary: Wednesday 15:30 IST / 10:00 UTC — verified against two
+# consecutive real resets, 2026-07-15 and 2026-07-22), independent of usage.
+# Period is exactly 7 days, so ANY Wednesday 15:30 IST lands on the same grid
+# as any other — the calendar date of the anchor below is arbitrary, only
+# the weekday/time matter. (Previously assumed Thursday without having
+# real reset data to check it against — that assumption was wrong: right at
+# the reset instant, Anthropic's API briefly reports 0% utilization with no
+# resets_at at all, which forces a fallback to this heuristic, and a
+# wrong anchor day made that fallback land on an entirely different,
+# bogus window until remote data resumed.)
+WEEKLY_ANCHOR = datetime(2026, 7, 15, 15, 30, tzinfo=IST)  # a confirmed real Wednesday reset
 WEEKLY_PERIOD = timedelta(days=7)
 
 # 5-hour limit: NOT a fixed clock grid. Confirmed empirically (2026-07-10) —
@@ -517,16 +525,37 @@ def poll_remote_usage_once():
     if weekly_pct is not None:
         snapshot = server.create_limit_snapshot(SOURCE_NAME, "weekly", weekly_pct)
         if snapshot.get("saved"):
-            server.record_weekly_daily_max(
-                SOURCE_NAME, weekly_pct, snapshot["window_start"], snapshot["window_end"], snapshot["created_at"]
-            )
+            # The core poll above (remote_usage_polls + limit_snapshots) has
+            # already succeeded and committed by this point — a bug in this
+            # secondary daily-max tracking must never turn the whole poll
+            # into a reported failure (confirmed: it silently killed the
+            # background poll thread entirely, since nothing here caught it,
+            # and made "Sync now" always report failure to the UI even
+            # though the real percentage had already updated). Deliberately
+            # NOT routed through record_remote_usage_error — that field
+            # drives the "sync failed" status the UI shows, and the actual
+            # sync did succeed here; just log it for later debugging.
+            try:
+                server.record_weekly_daily_max(
+                    SOURCE_NAME, weekly_pct, snapshot["window_start"], snapshot["window_end"], snapshot["created_at"]
+                )
+            except Exception:
+                traceback.print_exc()
 
     return {"ok": True}
 
 
 def _remote_usage_poll_loop():
     while True:
-        poll_remote_usage_once()
+        try:
+            poll_remote_usage_once()
+        except Exception:
+            # Backstop: an uncaught exception here would silently kill this
+            # daemon thread forever (confirmed — that's exactly what
+            # happened), with no further polling and no visible symptom
+            # beyond a slowly staling "last synced" time. Log and keep going
+            # rather than let one bad poll end all future polling.
+            traceback.print_exc()
         time.sleep(REMOTE_USAGE_POLL_SECONDS)
 
 
