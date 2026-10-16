@@ -20,6 +20,7 @@ import traceback
 from datetime import datetime, timedelta, timezone
 
 import server
+from pricing import resolve_rate
 
 SOURCE_NAME = "codex"
 
@@ -34,8 +35,10 @@ PRICING_PATH = os.path.join(server.APP_DIR, "pricing_codex.json")
 # Pricing ($ per 1,000,000 tokens), loaded from pricing_codex.json. Unlike
 # Claude's TTL cache-write tiers, OpenAI's prompt caching is a flat discount
 # on the *cached portion of input* (cached_input_tokens is a subset of
-# input_tokens, not additive) — no cache-write cost concept at all. On top of
-# that, OpenAI's API service tiers (standard/flex/batch/priority) apply a
+# input_tokens, not additive). GPT-5.6 and later also report cache writes,
+# which are another subset of input_tokens, billed instead of fresh input.
+# We store those in cache_5m_tokens (the shared cache-write bucket). On top of
+# that, OpenAI's API service tiers (standard/flex/batch/fast/ultrafast) apply a
 # flat multiplier to every rate; Codex logs the active tier per session in
 # `thread_settings_applied` events, tracked statefully the same way model is.
 # ---------------------------------------------------------------------------
@@ -57,37 +60,10 @@ def pricing_file_hash():
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def _pick_rate(schedule, ts_str):
-    dt = server._parse_ts(ts_str)
-    ordered = sorted(schedule, key=lambda e: e["from"] or "0000-01-01")
-    applicable = ordered[0]
-    for entry in ordered:
-        entry_from = entry.get("from")
-        if entry_from is None:
-            applicable = entry
-            continue
-        entry_from_dt = server._parse_ts(entry_from + "T00:00:00+00:00")
-        if dt is not None and entry_from_dt is not None and dt >= entry_from_dt:
-            applicable = entry
-    return (applicable["input"], applicable["output"], applicable["cached_input"])
-
-
-def price_for_model(model, ts_str):
+def price_for_model(model, ts_str, prompt_tokens=0):
     """Return (input, output, cached_input) $/Mtok for a model at a given time."""
-    pricing = load_pricing()
-    if not model:
-        model = "unknown"
-
-    schedule = pricing["models"].get(model)
-    if schedule:
-        return _pick_rate(schedule, ts_str)
-
-    for prefix, rate in pricing["prefix_fallback"]:
-        if model.startswith(prefix):
-            return (rate["input"], rate["output"], rate["cached_input"])
-
-    d = pricing["unknown_default"]
-    return (d["input"], d["output"], d["cached_input"])
+    rate = resolve_rate(load_pricing(), model, ts_str, prompt_tokens)
+    return (rate["input"], rate["output"], rate["cached_input"])
 
 
 def _tier_multiplier(service_tier):
@@ -98,26 +74,29 @@ def _tier_multiplier(service_tier):
 
 def compute_costs(model, ts_str, token_fields):
     """token_fields: {"input", "output", "cached_input", "reasoning_output",
-    "service_tier"}. `input` already includes `cached_input` as a subset
+    "cache_write", "service_tier"}. `input` includes cached reads and writes
     (OpenAI semantics — confirmed: input_tokens + output_tokens ==
-    total_tokens). Returns the same dict shape as claude.compute_costs, with
-    cost_cache_write always 0 (no cache-write concept for Codex)."""
+    total_tokens). Returns the same dict shape as claude.compute_costs."""
     input_tokens = token_fields.get("input", 0)
     output_tokens = token_fields.get("output", 0)
     cached_input = token_fields.get("cached_input", 0)
-    fresh_input = max(0, input_tokens - cached_input)
+    cache_write = min(max(0, token_fields.get("cache_write", 0)),
+                      max(0, input_tokens - cached_input))
+    fresh_input = max(0, input_tokens - cached_input - cache_write)
 
-    in_price, out_price, cached_price = price_for_model(model, ts_str)
+    rate = resolve_rate(load_pricing(), model, ts_str, input_tokens)
+    in_price, out_price, cached_price = rate["input"], rate["output"], rate["cached_input"]
     mult = _tier_multiplier(token_fields.get("service_tier"))
     in_ppt = in_price * mult / 1_000_000.0
     out_ppt = out_price * mult / 1_000_000.0
     cached_ppt = cached_price * mult / 1_000_000.0
+    write_ppt = rate.get("cache_write", in_price) * mult / 1_000_000.0
 
     cost_input = fresh_input * in_ppt
     cost_cache_read = cached_input * cached_ppt
     cost_output = output_tokens * out_ppt
-    cost_cache_write = 0.0
-    cost_cache = cost_cache_read
+    cost_cache_write = cache_write * write_ppt
+    cost_cache = cost_cache_read + cost_cache_write
     cost = cost_input + cost_output + cost_cache
     # If none of this had been cached, every cached token would instead have
     # been billed as plain (fresh) input.
@@ -137,11 +116,12 @@ def token_fields_from_row(row):
     """Rebuild the token_fields dict compute_costs expects from a stored
     `messages` row. `cache_read_tokens` is reused directly for Codex's
     cached_input_tokens (same semantic: tokens read from cache instead of
-    freshly processed) — no separate column needed."""
+    freshly processed); cache_5m_tokens stores Codex's cache-write subset."""
     return {
         "input": row["input_tokens"] or 0,
         "output": row["output_tokens"] or 0,
         "cached_input": row["cache_read_tokens"] or 0,
+        "cache_write": row["cache_5m_tokens"] or 0,
         "reasoning_output": row["reasoning_output_tokens"] or 0,
         "service_tier": row["service_tier"],
     }
@@ -267,11 +247,13 @@ def scan_file(conn, path, state):
                 input_tokens = int(last.get("input_tokens") or 0)
                 output_tokens = int(last.get("output_tokens") or 0)
                 cached_input = int(last.get("cached_input_tokens") or 0)
+                cache_write = int(last.get("cache_write_input_tokens") or 0)
                 reasoning_output = int(last.get("reasoning_output_tokens") or 0)
 
                 costs = compute_costs(
                     current_model or "unknown", ts,
                     {"input": input_tokens, "output": output_tokens, "cached_input": cached_input,
+                     "cache_write": cache_write,
                      "reasoning_output": reasoning_output, "service_tier": current_service_tier},
                 )
 
@@ -293,7 +275,7 @@ def scan_file(conn, path, state):
                         input_tokens,
                         output_tokens,
                         cached_input,   # cache_read_tokens (reused semantic)
-                        0,               # cache_5m_tokens — N/A for Codex
+                        cache_write,     # shared cache-write bucket (no TTL for Codex)
                         0,               # cache_1h_tokens — N/A for Codex
                         reasoning_output,
                         current_service_tier,

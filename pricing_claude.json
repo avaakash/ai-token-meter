@@ -1,7 +1,13 @@
 {
-  "last_verified": "2026-09-10",
-  "source": "Anthropic API pricing (platform.claude.com/docs/en/pricing), via the claude-api skill",
+  "last_verified": "2026-10-14",
+  "source": "Anthropic API pricing (platform.claude.com/docs/en/about-claude/pricing)",
   "models": {
+    "claude-fable-5-1": [
+      {"from": null, "input": 10.00, "output": 50.00, "cached_input": 0.25}
+    ],
+    "claude-mythos-5-1": [
+      {"from": null, "input": 10.00, "output": 50.00, "cached_input": 0.25}
+    ],
     "claude-fable-5": [
       {"from": null, "input": 10.00, "output": 50.00}
     ],
@@ -10,6 +16,12 @@
     ],
     "claude-mythos-preview": [
       {"from": null, "input": 10.00, "output": 50.00}
+    ],
+    "claude-opus-5-5": [
+      {"from": null, "input": 4.00, "output": 20.00, "cached_input": 0.20}
+    ],
+    "claude-opus-5": [
+      {"from": null, "input": 5.00, "output": 25.00}
     ],
     "claude-opus-4-8": [
       {"from": null, "input": 5.00, "output": 25.00}
@@ -29,6 +41,9 @@
     "claude-opus-4-0": [
       {"from": null, "input": 15.00, "output": 75.00}
     ],
+    "claude-sonnet-5-5": [
+      {"from": null, "input": 2.00, "output": 10.00, "cached_input": 0.10}
+    ],
     "claude-sonnet-5": [
       {"from": null, "input": 2.00, "output": 10.00}
     ],
@@ -40,6 +55,10 @@
     ],
     "claude-sonnet-4-0": [
       {"from": null, "input": 3.00, "output": 15.00}
+    ],
+    "claude-haiku-5-5": [
+      {"from": null, "input": 0.10, "output": 0.50, "cached_input": 0.01,
+       "long_context": {"above_tokens": 100000, "input": 0.50, "output": 2.50, "cached_input": 0.05}}
     ],
     "claude-haiku-4-5": [
       {"from": null, "input": 1.00, "output": 5.00}

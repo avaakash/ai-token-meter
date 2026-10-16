@@ -80,7 +80,7 @@ for window boundaries and drops the "Claude-reported %" line.
 | 🐍 `server.py` | Backend: log scanning, SQLite cache, pricing, HTTP API |
 | 📊 `index.html` | Main dashboard page |
 | 📋 `sessions.html` | All-sessions table (sortable / filterable / searchable) |
-| 💵 `pricing.json` | Per-model $/token rates, dated so historical costs don't shift when prices change |
+| 💵 `pricing_claude.json`, `pricing_codex.json` | Per-model rates per million tokens, with dated schedules, cache discounts, and context tiers |
 | ▶️ `start.sh` | Starts the server and opens the dashboard |
 | 🗄️ `usage.sqlite3` | Local cache (gitignored) — safe to delete, rebuilt from your logs |
 | 📝 `server.log` | Server output (gitignored) |

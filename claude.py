@@ -16,6 +16,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 import server
+from pricing import resolve_rate
 
 SOURCE_NAME = "claude"
 
@@ -38,7 +39,7 @@ REMOTE_USAGE_POLL_SECONDS = 600  # 10 minutes
 # ---------------------------------------------------------------------------
 # Pricing ($ per 1,000,000 tokens), loaded from pricing_claude.json — NOT
 # hardcoded. Each model maps to a chronological list of rate periods; see
-# _pick_rate for the resolution rule (latest "from" at-or-before a message's
+# pricing.resolve_rate for the rule (latest "from" at-or-before a message's
 # own timestamp). Historical costs never shift when pricing_claude.json gets
 # a new dated entry appended — only server.ensure_pricing_current's hash
 # check triggers a recompute, and each row re-resolves from its own timestamp.
@@ -61,37 +62,10 @@ def pricing_file_hash():
         return hashlib.sha256(f.read()).hexdigest()
 
 
-def _pick_rate(schedule, ts_str):
-    dt = server._parse_ts(ts_str)
-    ordered = sorted(schedule, key=lambda e: e["from"] or "0000-01-01")
-    applicable = ordered[0]
-    for entry in ordered:
-        entry_from = entry.get("from")
-        if entry_from is None:
-            applicable = entry
-            continue
-        entry_from_dt = server._parse_ts(entry_from + "T00:00:00+00:00")
-        if dt is not None and entry_from_dt is not None and dt >= entry_from_dt:
-            applicable = entry
-    return (applicable["input"], applicable["output"])
-
-
-def price_for_model(model, ts_str):
+def price_for_model(model, ts_str, prompt_tokens=0):
     """Return (input_price_per_mtok, output_price_per_mtok) for a model at a given time."""
-    pricing = load_pricing()
-    if not model:
-        model = "unknown"
-
-    schedule = pricing["models"].get(model)
-    if schedule:
-        return _pick_rate(schedule, ts_str)
-
-    for prefix, rate in pricing["prefix_fallback"]:
-        if model.startswith(prefix):
-            return (rate["input"], rate["output"])
-
-    d = pricing["unknown_default"]
-    return (d["input"], d["output"])
+    rate = resolve_rate(load_pricing(), model, ts_str, prompt_tokens)
+    return (rate["input"], rate["output"])
 
 
 def compute_costs(model, ts_str, token_fields):
@@ -104,12 +78,14 @@ def compute_costs(model, ts_str, token_fields):
     cache_5m = token_fields.get("cache_5m", 0)
     cache_1h = token_fields.get("cache_1h", 0)
 
-    in_price, out_price = price_for_model(model, ts_str)
+    prompt_tokens = input_tokens + cache_read + cache_5m + cache_1h
+    rate = resolve_rate(load_pricing(), model, ts_str, prompt_tokens)
+    in_price, out_price = rate["input"], rate["output"]
     in_ppt = in_price / 1_000_000.0
     out_ppt = out_price / 1_000_000.0
     cost_input = input_tokens * in_ppt
     cost_output = output_tokens * out_ppt
-    cost_cache_read = cache_read * in_ppt * 0.1
+    cost_cache_read = cache_read * rate.get("cached_input", in_price * 0.1) / 1_000_000.0
     cost_cache_write = cache_5m * in_ppt * 1.25 + cache_1h * in_ppt * 2.0
     cost_cache = cost_cache_read + cost_cache_write
     cost = cost_input + cost_output + cost_cache

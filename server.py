@@ -19,6 +19,7 @@ import json
 import os
 import sqlite3
 import socketserver
+import statistics
 import sys
 import threading
 from datetime import datetime, timedelta, timezone
@@ -951,24 +952,35 @@ def list_weekly_usage(source=None, limit=20):
 
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
+        # Collapsed per source BEFORE the limit is applied: a fragmenting
+        # source (see _collapse_overlapping_windows) would otherwise fill the
+        # whole list with near-duplicate rows covering one real week, which is
+        # what made the weekly column show the same date several times over.
         if source:
-            windows = conn.execute(
+            rows = conn.execute(
                 """
                 SELECT source, window_start, window_end, created_at
-                FROM weekly_windows WHERE source = ?
-                ORDER BY window_start DESC LIMIT ?
+                FROM weekly_windows WHERE source = ? ORDER BY window_start DESC
                 """,
-                (source, limit),
+                (source,),
             ).fetchall()
         else:
-            windows = conn.execute(
+            rows = conn.execute(
                 """
                 SELECT source, window_start, window_end, created_at
-                FROM weekly_windows
-                ORDER BY window_start DESC LIMIT ?
-                """,
-                (limit,),
+                FROM weekly_windows ORDER BY window_start DESC
+                """
             ).fetchall()
+
+        now = datetime.now(timezone.utc)
+        by_source = {}
+        for r in rows:
+            by_source.setdefault(r["source"], []).append(r)
+        windows = []
+        for src_rows in by_source.values():
+            windows.extend(_collapse_overlapping_windows(src_rows, now)[:limit])
+        windows.sort(key=lambda r: r["window_start"], reverse=True)
+        windows = windows[:limit]
 
         result = []
         for w in windows:
@@ -985,19 +997,29 @@ def list_weekly_usage(source=None, limit=20):
                 {"day": d["day"], "latest_percentage": d["latest_percentage"], "updated_at": d["updated_at"]}
                 for d in days
             ]
+            # From the raw poll history rather than the daily table: a
+            # collapsed window's own readings are filed under whichever
+            # fragment key was current when each was recorded, so the daily
+            # rows under this key can be empty for a week that was heavily
+            # used. None (not 0) when there were no polls at all, so callers
+            # can still tell "unused" from "unknown".
+            peak = conn.execute(
+                """
+                SELECT MAX(percentage) AS peak FROM limit_snapshots
+                WHERE source = ? AND window_type = 'weekly'
+                  AND created_at >= ? AND created_at < ?
+                """,
+                (w["source"], w["window_start"], w["window_end"]),
+            ).fetchone()["peak"]
+            if peak is None and daily_max:
+                peak = daily_max[-1]["latest_percentage"]
             result.append({
                 "source": w["source"],
                 "window_start": w["window_start"],
                 "window_end": w["window_end"],
                 "created_at": w["created_at"],
                 "daily_max": daily_max,
-                # The rolling weekly quota can go up or down within a window
-                # (see _upsert_weekly_daily_max), so there's no single "peak"
-                # that represents the week — the most recent day's latest
-                # reading is the closest thing to "where usage currently
-                # stands" for that week. None (not 0) when nothing was ever
-                # recorded, so callers can distinguish "unused" from "unknown".
-                "week_max_percentage": daily_max[-1]["latest_percentage"] if daily_max else None,
+                "week_max_percentage": peak,
             })
         return result
 
@@ -1099,27 +1121,41 @@ def predict_weekly_usage(source):
 
         # The one window (if any) still in progress; everything else has
         # fully played out and is eligible for the historical average.
+        # Overlapping rows are collapsed first — a source whose reported reset
+        # time is recomputed from "now" on every poll (Codex) accumulates one
+        # near-duplicate window row per poll, and counting each as a separate
+        # completed week made the "typical week" average meaningless
+        # (confirmed: 1363 "weeks" averaging 0.3%, since almost every fragment
+        # covers a sliver of one real week).
         current = None
         completed = []
-        for w in windows:
+        for w in _collapse_overlapping_windows(windows, now):
             w_end = _parse_ts(w["window_end"])
             if current is None and w_end is not None and w_end > now:
                 current = w
             else:
                 completed.append(w)
 
+        # Each completed week's peak reading, read straight from the raw poll
+        # history rather than from weekly_daily_max_pct. That table is keyed by
+        # the window_start a reading was filed under, so for a fragmenting
+        # source its rows scatter across hundreds of near-duplicate keys and a
+        # collapsed window finds almost none of its own readings under its own
+        # key (confirmed: real weeks that peaked above 50% looked like 0%).
+        # Peak rather than latest, because the reading right at a reset rolls
+        # back to 0 and that artifact would otherwise become the week's total.
         historical_finals = []
         for w in completed:
             row = conn.execute(
                 """
-                SELECT latest_percentage FROM weekly_daily_max_pct
-                WHERE source = ? AND window_start = ?
-                ORDER BY day DESC LIMIT 1
+                SELECT MAX(percentage) AS peak FROM limit_snapshots
+                WHERE source = ? AND window_type = 'weekly'
+                  AND created_at >= ? AND created_at < ?
                 """,
-                (source, w["window_start"]),
+                (source, w["window_start"], w["window_end"]),
             ).fetchone()
-            if row is not None:
-                historical_finals.append(row["latest_percentage"])
+            if row is not None and row["peak"] is not None:
+                historical_finals.append(row["peak"])
 
         historical_avg = (
             sum(historical_finals) / len(historical_finals)
@@ -1165,6 +1201,312 @@ def predict_weekly_usage(source):
         "current_percentage": current_percentage,
         "current_window_start": current_window_start,
         "current_window_end": current_window_end,
+        "exhaustion": predict_weekly_exhaustion(source),
+    }
+
+
+# ---------------------------------------------------------------------------
+# "When will I run out?" — projected exhaustion time for the weekly window.
+#
+# Built off limit_snapshots (one remote-reported % reading per ~10-minute
+# poll) rather than weekly_daily_max_pct (one reading per day): an ETA needs
+# sub-day resolution, and the snapshot table already holds it.
+#
+# The naive model — scale current % by elapsed wall-clock fraction — is
+# badly biased, because usage is bursty and follows a working rhythm (nights
+# and weekends contribute nearly nothing). Backtested over the weekly history
+# in this DB it overshoots badly early in the week. So instead we learn the
+# SHAPE of a typical week: the median cumulative share of a week's final
+# usage reached by each elapsed hour. Projecting through that shape, and then
+# walking it forward to find where the curve would cross 100%, was ~40% more
+# accurate than flat scaling in backtest (see typical_error_pp, which is
+# recomputed from the user's own history rather than hardcoded).
+# ---------------------------------------------------------------------------
+
+EXHAUSTION_MIN_REFERENCE_WEEKS = 3
+EXHAUSTION_MIN_ELAPSED_HOURS = 12    # before this, the shape denominator is tiny and the projection is noise
+EXHAUSTION_MIN_SHAPE_FRACTION = 0.05
+EXHAUSTION_MIN_WEEK_FINAL_PCT = 5    # a barely-used week teaches nothing about pacing
+EXHAUSTION_MIN_WEEK_COVERAGE_HOURS = 100
+EXHAUSTION_SHAPE_HOURS = 168
+
+
+def _weekly_snapshot_series(conn, source):
+    """One entry per tracked weekly window: its cleaned (timestamp, %) series.
+
+    Readings below the window's running max are dropped — at the reset
+    instant the remote API briefly reports 0% against the not-yet-rolled
+    window (see create_limit_snapshot), and a stale low reading mid-series
+    would otherwise look like the quota went backwards."""
+    windows = conn.execute(
+        """
+        SELECT window_start, window_end FROM weekly_windows
+        WHERE source = ? ORDER BY window_start ASC
+        """,
+        (source,),
+    ).fetchall()
+
+    series = []
+    for w in windows:
+        start, end = _parse_ts(w["window_start"]), _parse_ts(w["window_end"])
+        if start is None or end is None:
+            continue
+        rows = conn.execute(
+            """
+            SELECT created_at, percentage FROM limit_snapshots
+            WHERE source = ? AND window_type = 'weekly'
+              AND created_at >= ? AND created_at < ?
+            ORDER BY created_at ASC
+            """,
+            (source, w["window_start"], w["window_end"]),
+        ).fetchall()
+
+        points, running_max = [], 0.0
+        for r in rows:
+            ts = _parse_ts(r["created_at"])
+            if ts is None or r["percentage"] is None or r["percentage"] < running_max:
+                continue
+            running_max = r["percentage"]
+            points.append((ts, r["percentage"]))
+        if points:
+            series.append({
+                "start": start,
+                "end": end,
+                "points": points,
+                "final": points[-1][1],
+                "coverage_hours": (points[-1][0] - start).total_seconds() / 3600.0,
+            })
+    return series
+
+
+def _collapse_overlapping(items, start_of, end_of, anchor=None):
+    """Reduce a set of time windows to genuinely separate ones, newest first,
+    by walking backwards and skipping anything that overlaps what's already
+    been kept. `anchor`, when given, is always kept as the newest entry.
+
+    Sources whose reported reset time is recomputed from "now" on every poll
+    (Codex) accumulate one near-duplicate window row per poll — see
+    _resolve_weekly_window_key — and all of those rows cover the same
+    underlying week. Without this, one real week gets counted hundreds of
+    times."""
+    ordered = sorted(items, key=start_of, reverse=True)
+    kept = []
+    boundary = None
+    if anchor is not None:
+        kept.append(anchor)
+        boundary = start_of(anchor)
+    for item in ordered:
+        if anchor is not None and item is anchor:
+            continue
+        if boundary is not None and end_of(item) > boundary:
+            continue
+        kept.append(item)
+        boundary = start_of(item)
+    return kept
+
+
+def _collapse_overlapping_windows(rows, now):
+    """_collapse_overlapping for raw weekly_windows rows, anchored on the
+    window still in progress so the current week is never dropped in favour
+    of an overlapping fragment."""
+    usable = [r for r in rows if _parse_ts(r["window_start"]) and _parse_ts(r["window_end"])]
+    anchor = next(
+        (r for r in sorted(usable, key=lambda r: _parse_ts(r["window_start"]), reverse=True)
+         if _parse_ts(r["window_end"]) > now),
+        None,
+    )
+    return _collapse_overlapping(
+        usable,
+        start_of=lambda r: _parse_ts(r["window_start"]),
+        end_of=lambda r: _parse_ts(r["window_end"]),
+        anchor=anchor,
+    )
+
+
+def _distinct_weeks(series, current):
+    return _collapse_overlapping(
+        series, start_of=lambda e: e["start"], end_of=lambda e: e["end"], anchor=current
+    )
+
+
+def _pct_at_hour(entry, hour):
+    """The window's reported % as of `hour` elapsed hours in, or None if the
+    series doesn't reach back that far."""
+    target = entry["start"] + timedelta(hours=hour)
+    seen = [p for t, p in entry["points"] if t <= target]
+    return max(seen) if seen else None
+
+
+def _cumulative_shape(reference):
+    """Median cumulative share of a week's final usage by each elapsed hour,
+    across the reference weeks. Monotone by construction."""
+    shape = []
+    previous = 0.0
+    for hour in range(EXHAUSTION_SHAPE_HOURS + 1):
+        shares = []
+        for entry in reference:
+            if entry["coverage_hours"] < hour:
+                continue
+            pct = _pct_at_hour(entry, hour)
+            if pct is not None:
+                shares.append(min(1.0, pct / entry["final"]))
+        value = statistics.median(shares) if shares else previous
+        previous = max(previous, value)
+        shape.append(previous)
+    return shape
+
+
+def _shape_crossing_hour(shape, projected_final, from_hour):
+    """First elapsed hour at or after `from_hour` where the projected curve
+    (projected_final scaled by the shape) reaches 100%, linearly interpolated
+    between the hourly samples. None if it never does within the window."""
+    if projected_final <= 100:
+        return None
+    start = max(0, int(from_hour))
+    for hour in range(start, EXHAUSTION_SHAPE_HOURS):
+        low, high = projected_final * shape[hour], projected_final * shape[hour + 1]
+        if high >= 100:
+            if high == low:
+                return float(hour + 1)
+            return hour + (100 - low) / (high - low)
+    return None
+
+
+def predict_weekly_exhaustion(source):
+    """Project when the weekly quota would hit 100% at the current pace.
+
+    Returns a dict that is always shaped the same; `available` is False (with
+    a `reason`) whenever there isn't enough data to say anything honest."""
+    if source not in SOURCES:
+        raise ValueError(f"unknown source: {source}")
+
+    def unavailable(reason, **extra):
+        return {
+            "available": False, "reason": reason, "method": None,
+            "current_percentage": None, "elapsed_hours": None,
+            "projected_final_percentage": None,
+            "projected_final_low": None, "projected_final_high": None,
+            "will_exhaust": None, "exhaustion_at": None,
+            "exhaustion_at_earliest": None, "exhaustion_at_latest": None,
+            "seconds_until_exhaustion": None, "burn_rate_pct_per_day": None,
+            "reference_weeks": 0, "typical_error_pp": None,
+            "window_end": None, **extra,
+        }
+
+    now = datetime.now(timezone.utc)
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        series = _weekly_snapshot_series(conn, source)
+
+    current = next((e for e in reversed(series) if e["start"] <= now < e["end"]), None)
+    if current is None:
+        return unavailable("no weekly window in progress")
+
+    series = _distinct_weeks(series, current)
+
+    elapsed_hours = (now - current["start"]).total_seconds() / 3600.0
+    current_pct = current["points"][-1][1]
+    window_end = current["end"].isoformat()
+    burn_rate = current_pct / elapsed_hours * 24 if elapsed_hours > 0 else None
+
+    if elapsed_hours < EXHAUSTION_MIN_ELAPSED_HOURS:
+        return unavailable(
+            f"only {elapsed_hours:.0f}h into the week — too early to project",
+            current_percentage=current_pct, elapsed_hours=elapsed_hours,
+            burn_rate_pct_per_day=burn_rate, window_end=window_end,
+        )
+
+    reference = [
+        e for e in series
+        if e is not current
+        and e["final"] >= EXHAUSTION_MIN_WEEK_FINAL_PCT
+        and e["coverage_hours"] >= EXHAUSTION_MIN_WEEK_COVERAGE_HOURS
+    ]
+
+    hour_index = min(EXHAUSTION_SHAPE_HOURS, int(elapsed_hours))
+    method = "shape"
+    shape = _cumulative_shape(reference) if len(reference) >= EXHAUSTION_MIN_REFERENCE_WEEKS else None
+    if shape is None or shape[hour_index] < EXHAUSTION_MIN_SHAPE_FRACTION:
+        # Not enough comparable weeks (or the typical week has barely started
+        # by now) — fall back to flat wall-clock scaling, which is worse but
+        # at least says something. The UI leans on `method` to hedge it.
+        method = "flat"
+        shape = [hour / EXHAUSTION_SHAPE_HOURS for hour in range(EXHAUSTION_SHAPE_HOURS + 1)]
+
+    projected_final = current_pct / shape[hour_index] if shape[hour_index] > 0 else None
+    if projected_final is None:
+        return unavailable("no usable pace signal yet", current_percentage=current_pct,
+                           elapsed_hours=elapsed_hours, burn_rate_pct_per_day=burn_rate,
+                           window_end=window_end)
+
+    # Calibrate the uncertainty band against how this same projection would
+    # have done at this same point in each reference week — the spread of
+    # actual/predicted ratios IS the error bar, measured on the user's own
+    # history instead of assumed.
+    ratios, errors = [], []
+    for entry in reference:
+        if entry["coverage_hours"] < hour_index:
+            continue
+        pct_then = _pct_at_hour(entry, hour_index)
+        if pct_then is None or shape[hour_index] <= 0:
+            continue
+        predicted = pct_then / shape[hour_index]
+        if predicted <= 0:
+            continue
+        ratios.append(entry["final"] / predicted)
+        errors.append(abs(min(100.0, predicted) - entry["final"]))
+
+    if ratios:
+        ordered = sorted(ratios)
+        low_ratio = ordered[int(len(ordered) * 0.2)]
+        high_ratio = ordered[min(len(ordered) - 1, int(len(ordered) * 0.8))]
+    else:
+        low_ratio = high_ratio = None
+
+    projected_low = projected_final * low_ratio if low_ratio is not None else None
+    projected_high = projected_final * high_ratio if high_ratio is not None else None
+
+    def crossing_iso(final_value):
+        if final_value is None:
+            return None
+        hour = _shape_crossing_hour(shape, final_value, elapsed_hours)
+        if hour is None:
+            return None
+        # The shape is sampled hourly, so a crossing can interpolate to a
+        # moment just behind `now`; report it as "now" rather than as a time
+        # in the past.
+        return max(now, current["start"] + timedelta(hours=hour)).isoformat()
+
+    exhaustion_at = crossing_iso(projected_final)
+    # A higher projected total burns the quota sooner, so the optimistic
+    # (latest) ETA comes from the low end of the band and vice versa.
+    earliest = crossing_iso(projected_high)
+    latest = crossing_iso(projected_low)
+
+    seconds_until = None
+    if exhaustion_at is not None:
+        eta = _parse_ts(exhaustion_at)
+        if eta is not None:
+            seconds_until = max(0.0, (eta - now).total_seconds())
+
+    return {
+        "available": True,
+        "reason": None,
+        "method": method,
+        "current_percentage": current_pct,
+        "elapsed_hours": elapsed_hours,
+        "projected_final_percentage": min(100.0, projected_final),
+        "projected_final_low": min(100.0, projected_low) if projected_low is not None else None,
+        "projected_final_high": min(100.0, projected_high) if projected_high is not None else None,
+        "will_exhaust": exhaustion_at is not None,
+        "exhaustion_at": exhaustion_at,
+        "exhaustion_at_earliest": earliest,
+        "exhaustion_at_latest": latest,
+        "seconds_until_exhaustion": seconds_until,
+        "burn_rate_pct_per_day": burn_rate,
+        "reference_weeks": len(reference),
+        "typical_error_pp": statistics.mean(errors) if errors else None,
+        "window_end": window_end,
     }
 
 
@@ -1208,6 +1550,36 @@ def _where(source, *extra):
     if conditions:
         return "WHERE " + " AND ".join(conditions), tuple(params)
     return "", ()
+
+
+USAGE_PERIODS = [("1d", 1), ("3d", 3), ("7d", 7), ("2w", 14), ("1m", 30), ("3m", 90), ("6m", 180), ("1y", 365)]
+
+
+def build_period_totals(conn, source, now=None):
+    """Rolling-window totals keyed by period ("1d", "7d", ...). Cutoffs are
+    formatted like the stored timestamps (UTC, millisecond "Z" suffix) so a
+    plain string comparison is a correct time comparison."""
+    now = now or datetime.now(timezone.utc)
+    where_sql, where_params = _where(source, "timestamp >= ?")
+    periods = {}
+    for key, days in USAGE_PERIODS:
+        since = (now - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        row = conn.execute(
+            f"""
+            SELECT
+                COALESCE(SUM(input_tokens), 0) AS input_tokens,
+                COALESCE(SUM(output_tokens), 0) AS output_tokens,
+                COALESCE(SUM(cache_read_tokens), 0) AS cache_read_tokens,
+                COALESCE(SUM(cache_5m_tokens + cache_1h_tokens), 0) AS cache_write_tokens,
+                COALESCE(SUM(cost), 0) AS cost,
+                COUNT(*) AS message_count,
+                COUNT(DISTINCT session_id) AS session_count
+            FROM messages {where_sql}
+            """,
+            where_params + (since,),
+        ).fetchone()
+        periods[key] = {**{k: row[k] for k in row.keys()}, "days": days, "since": since}
+    return periods
 
 
 def build_usage_payload(source="all"):
@@ -1426,6 +1798,8 @@ def build_usage_payload(source="all"):
             today_where_params + (today,),
         ).fetchone()
 
+        periods = build_period_totals(conn, source)
+
         limits = {name: build_limit_windows(conn, name) for name in SOURCES}
 
     def row_to_dict(r):
@@ -1442,6 +1816,7 @@ def build_usage_payload(source="all"):
         "totals": row_to_dict(totals),
         "by_source": [row_to_dict(r) for r in by_source],
         "today": row_to_dict(today_row),
+        "periods": periods,
         "limits": limits,
         "by_model": [row_to_dict(r) for r in by_model],
         "by_day": [row_to_dict(r) for r in by_day],
@@ -1665,6 +2040,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
+            # The page is read straight off disk on every request, so a
+            # browser holding a heuristically-cached copy is the one way the
+            # UI can lag the code that's actually running.
+            self.send_header("Cache-Control", "no-store")
             self.end_headers()
             self.wfile.write(body)
         except OSError:

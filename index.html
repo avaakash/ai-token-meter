@@ -91,11 +91,26 @@
   /* ---------- Stat cards ---------- */
   .grid-top {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     gap: 14px;
     margin-bottom: 22px;
   }
+  .grid-top .period-card { grid-column: span 2; }
+  @media (max-width: 1200px) { .grid-top { grid-template-columns: repeat(4, 1fr); } .grid-top .period-card { grid-column: 1 / -1; } }
   @media (max-width: 900px) { .grid-top { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 500px) { .grid-top { grid-template-columns: 1fr; } }
+
+  .period-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .period-card-head .label { margin-bottom: 0; }
+  .period-toggle { display: inline-flex; flex-wrap: wrap; background: var(--card-alt); border: 1px solid var(--border); border-radius: 7px; padding: 2px; gap: 2px; }
+  .period-toggle button {
+    background: transparent; border: none; color: var(--muted); cursor: pointer;
+    font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 5px; font-family: inherit;
+  }
+  .period-toggle button:hover { color: var(--text); }
+  .period-toggle button.active { background: var(--accent); color: var(--accent-text); }
+  .period-values { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .period-values .period-tokens { font-size: 17px; font-weight: 650; color: var(--muted); }
 
   .stat-card {
     background: var(--card);
@@ -247,6 +262,7 @@
   @media (max-width: 480px) { .limit-usage-cols { flex-direction: column; gap: 10px; } }
   .limit-prediction { margin-top: 10px !important; border-bottom: 1px dashed var(--border); display: inline-block; cursor: default; }
   .limit-prediction:empty { display: none; }
+  .limit-prediction.runout-risk { color: var(--red); }
   .limit-daily-max-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; font-weight: 600; margin-bottom: 6px; }
   .limit-daily-max-empty { color: var(--muted); font-size: 11.5px; }
 
@@ -449,6 +465,17 @@
       <div class="label">Messages logged</div>
       <div class="value" id="total-messages">–</div>
       <div class="hint">assistant turns, deduped</div>
+    </div>
+    <div class="stat-card period-card">
+      <div class="period-card-head">
+        <div class="label" id="period-label">Last 7 days</div>
+        <div class="period-toggle" id="period-toggle" role="tablist" aria-label="Usage period"></div>
+      </div>
+      <div class="period-values">
+        <div class="value accent" id="period-cost">–</div>
+        <div class="period-tokens" id="period-tokens">–</div>
+      </div>
+      <div class="hint" id="period-breakdown">–</div>
     </div>
   </div>
 
@@ -727,6 +754,46 @@ function initSourceToggle() {
       refresh();
     });
   });
+}
+
+/* ---------- Usage-in-period card ---------- */
+const PERIOD_LABELS = {
+  "1d": "Last 24 hours", "3d": "Last 3 days", "7d": "Last 7 days", "2w": "Last 2 weeks",
+  "1m": "Last 30 days", "3m": "Last 90 days", "6m": "Last 180 days", "1y": "Last 365 days",
+};
+let currentPeriod = localStorage.getItem("dashboard-period");
+if (!(currentPeriod in PERIOD_LABELS)) currentPeriod = "7d";
+let lastPeriods = null;
+
+function initPeriodToggle() {
+  const toggle = document.getElementById("period-toggle");
+  toggle.innerHTML = Object.keys(PERIOD_LABELS)
+    .map(key => `<button type="button" data-period="${key}" title="${PERIOD_LABELS[key]}">${key}</button>`)
+    .join("");
+  toggle.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentPeriod = btn.dataset.period;
+      localStorage.setItem("dashboard-period", currentPeriod);
+      renderPeriodCard();
+    });
+  });
+}
+
+function renderPeriodCard() {
+  document.querySelectorAll("#period-toggle button")
+    .forEach(b => b.classList.toggle("active", b.dataset.period === currentPeriod));
+  document.getElementById("period-label").textContent = PERIOD_LABELS[currentPeriod];
+  const p = lastPeriods && lastPeriods[currentPeriod];
+  if (!p) return;
+  const totalTokens = (p.input_tokens || 0) + (p.output_tokens || 0)
+    + (p.cache_read_tokens || 0) + (p.cache_write_tokens || 0);
+  document.getElementById("period-cost").textContent = fmtCost(p.cost);
+  document.getElementById("period-tokens").textContent = fmtNum(totalTokens) + " tokens";
+  document.getElementById("period-breakdown").textContent =
+    fmtNum(p.input_tokens) + " in · " + fmtNum(p.output_tokens) + " out · " +
+    fmtNum(p.cache_read_tokens) + " cached · " + fmtNum(p.message_count) + " msgs · " +
+    fmtNum(p.session_count) + " sessions · avg " + fmtCost(p.cost / p.days) + "/day";
+  document.getElementById("period-label").title = "Since " + new Date(p.since).toLocaleString();
 }
 
 /* ---------- Shared hover tooltip ---------- */
@@ -1181,21 +1248,36 @@ function renderWeeklyMaxCol(card, weeks) {
   });
 }
 
+function projectedWeeklyPercent(prediction) {
+  if (!prediction) return null;
+  const ex = prediction.exhaustion;
+  if (ex && ex.available && ex.projected_final_percentage != null) return ex.projected_final_percentage;
+  return prediction.pace_projection_percentage;
+}
+
 function renderWeeklyPrediction(card, prediction) {
   const el = card.querySelector(".limit-prediction");
   if (!el) return;
   if (!prediction) { el.textContent = ""; return; }
 
-  const { historical_avg_percentage, pace_projection_percentage, historical_weeks_used, historical_weeks_needed } = prediction;
+  const { historical_avg_percentage, historical_weeks_used, historical_weeks_needed } = prediction;
+  // One projected number for the week, stated once. The shape-aware
+  // projection is preferred over the flat elapsed-time one (flat scaling
+  // overshoots, since it assumes usage continues through nights and
+  // weekends), and the run-out verdict is appended to this same line rather
+  // than repeating the percentage on a line of its own.
+  const projected = projectedWeeklyPercent(prediction);
 
-  if (historical_avg_percentage != null) {
-    let text = "Typically ~" + Math.round(historical_avg_percentage) + "%/week";
-    if (pace_projection_percentage != null) {
-      text += " · trending toward ~" + Math.round(pace_projection_percentage) + "% this week";
+  if (projected != null) {
+    let text = "~" + Math.round(projected) + "% projected this week";
+    if (historical_avg_percentage != null) {
+      text += ", vs ~" + Math.round(historical_avg_percentage) + "% typical";
     }
+    const verdict = weeklyRunoutVerdict(prediction);
+    if (verdict) text += " · " + verdict;
     el.textContent = text;
-  } else if (pace_projection_percentage != null) {
-    el.textContent = "At this pace, ~" + Math.round(pace_projection_percentage) + "% this week";
+  } else if (historical_avg_percentage != null) {
+    el.textContent = "Typically ~" + Math.round(historical_avg_percentage) + "%/week";
   } else if (historical_weeks_used != null) {
     el.textContent = "Predicting weekly usage — collecting data (" + historical_weeks_used + "/" + historical_weeks_needed + " weeks tracked)";
   } else {
@@ -1203,12 +1285,52 @@ function renderWeeklyPrediction(card, prediction) {
     return;
   }
 
+  el.classList.toggle("runout-risk", !!(prediction.exhaustion
+    && prediction.exhaustion.available && prediction.exhaustion.will_exhaust));
+  attachWeeklyPredictionTooltip(el, prediction);
+}
+
+/* "When will I run out?" — the tail of the prediction line. The server
+   projects the current week's % forward through the shape of a typical week
+   (see predict_weekly_exhaustion) and reports a central ETA plus a band
+   calibrated on past weeks. Only the verdict goes on the card; the numbers
+   behind it live in the tooltip, so the line stays one short clause. */
+function weeklyRunoutVerdict(prediction) {
+  const ex = prediction && prediction.exhaustion;
+  if (!ex || !ex.available) return null;
+  if (ex.will_exhaust && ex.exhaustion_at) {
+    return "runs out " + fmtIST(ex.exhaustion_at);
+  }
+  return ex.exhaustion_at_earliest ? "no slack" : "comfortable";
+}
+
+function attachWeeklyPredictionTooltip(el, prediction) {
+  const ex = prediction && prediction.exhaustion;
+  if (!ex || !ex.available) {
+    attachTooltip(el, () => `
+      <div class="tt-title">How this is predicted</div>
+      <div class="tt-row">Built only from the remote-reported % history —</div>
+      <div class="tt-row">never from local $ cost, which misses web chat / Cowork.</div>`
+      + (ex && ex.reason ? `<div class="tt-row" style="margin-top:4px;">No run-out estimate: ${escapeHtml(ex.reason)}</div>` : ""));
+    return;
+  }
+
+  const projected = Math.round(ex.projected_final_percentage);
   attachTooltip(el, () => `
-    <div class="tt-title">How this is predicted</div>
-    <div class="tt-row">Built only from the remote-reported % history —</div>
-    <div class="tt-row">never from local $ cost, which misses web chat / Cowork.</div>
-    <div class="tt-row" style="margin-top:4px;">"Typically" = average of completed weeks' final reading.</div>
-    <div class="tt-row">"At this pace" = current reading scaled up by elapsed time.</div>
+    <div class="tt-title">Run-out estimate</div>
+    <div class="tt-row">Projected total: ~${projected}%`
+      + (ex.projected_final_low != null && ex.projected_final_high != null
+          ? ` (range ${Math.round(ex.projected_final_low)}–${Math.round(ex.projected_final_high)}%)` : "")
+      + `</div>
+    <div class="tt-row">Current: ${Math.round(ex.current_percentage)}% · ${Math.round(ex.elapsed_hours)}h into the week</div>
+    <div class="tt-row">Burn rate: ~${ex.burn_rate_pct_per_day != null ? ex.burn_rate_pct_per_day.toFixed(1) : "?"}%/day</div>
+    <div class="tt-row" style="margin-top:4px;">${ex.method === "shape"
+        ? "Projected through the shape of a typical week (nights and"
+          + "<br>weekends count for little), learned from " + ex.reference_weeks + " past weeks."
+        : "Flat scaling by elapsed time — not enough past weeks yet<br>to learn your usual weekly rhythm, so treat this as rough."}</div>`
+      + (ex.typical_error_pp != null
+          ? `<div class="tt-row">Typical error at this point in the week: ±${Math.round(ex.typical_error_pp)} pts.</div>` : "")
+      + `<div class="tt-row">Accuracy improves sharply after mid-week.</div>
   `);
 }
 
@@ -1290,16 +1412,28 @@ function computeWeeklyBanners(label, weeklyWindow, prediction) {
   if (!weeklyWindow || weeklyWindow.seconds_remaining == null) return banners;
 
   const currentPct = windowUsedPercent(weeklyWindow);
-  const pace = prediction ? prediction.pace_projection_percentage : null;
+  const pace = projectedWeeklyPercent(prediction);
   const historicalAvg = prediction ? prediction.historical_avg_percentage : null;
 
   const periodSeconds = (new Date(weeklyWindow.window_end) - new Date(weeklyWindow.window_start)) / 1000;
   const pastHalfway = periodSeconds > 0 && weeklyWindow.seconds_remaining <= periodSeconds / 2;
 
   // Too fast: on track to exceed the weekly quota (or already very high) before reset.
+  const exhaustion = prediction ? prediction.exhaustion : null;
+  const runsOut = exhaustion && exhaustion.available && exhaustion.will_exhaust && exhaustion.exhaustion_at;
+
   const trendValue = pace != null ? pace : currentPct;
   const projectedHigh = trendValue != null && trendValue > WEEKLY_AT_RISK_PCT;
-  if (projectedHigh) {
+  if (runsOut) {
+    banners.push({
+      severity: "urgent",
+      icon: "🔥",
+      html: `<b>${escapeHtml(label)}</b> is on pace to run out of its weekly quota around `
+        + `<b>${escapeHtml(fmtIST(exhaustion.exhaustion_at))}</b> — `
+        + `<b>${fmtDuration(exhaustion.seconds_until_exhaustion)}</b> from now, and `
+        + `<b>${fmtDuration(weeklyWindow.seconds_remaining)}</b> before it resets.`,
+    });
+  } else if (projectedHigh) {
     banners.push({
       severity: "urgent",
       icon: "🔥",
@@ -1908,6 +2042,8 @@ async function refresh() {
       fmtNum(data.totals.input_tokens) + " in · " + fmtNum(data.totals.output_tokens) + " out · " +
       fmtNum(data.totals.cache_read_tokens) + " cached";
     document.getElementById("total-messages").textContent = fmtNum(data.totals.message_count);
+    lastPeriods = data.periods;
+    renderPeriodCard();
 
     renderLimits(data.limits);
     refreshLimitLogs();
@@ -1971,6 +2107,8 @@ wireSyncControls("claude");
 wireSyncControls("codex");
 
 initSourceToggle();
+initPeriodToggle();
+renderPeriodCard();
 refresh();
 setInterval(refresh, REFRESH_MS);
 </script>
