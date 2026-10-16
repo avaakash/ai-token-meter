@@ -1520,6 +1520,18 @@ function level(value, max) {
   if (frac > 0.2) return 2;
   return 1;
 }
+// A recorded or app-given title; else the session's first prompt, quoted;
+// else an untitled label that still says which project and when.
+function sessionDisplayName(r) {
+  if (r.title) return r.title;
+  if (r.first_prompt) {
+    const p = r.first_prompt.length > 80 ? r.first_prompt.slice(0, 78).trimEnd() + "…" : r.first_prompt;
+    return "“" + p + "”";
+  }
+  const when = r.start_ts ? new Date(r.start_ts).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+  return ["Untitled", r.project || "unknown", when].filter(Boolean).join(" · ");
+}
+
 function sessionLabel(r) {
   const start = r.start_ts ? new Date(r.start_ts) : null;
   const end = r.end_ts ? new Date(r.end_ts) : null;
@@ -1528,8 +1540,8 @@ function sessionLabel(r) {
   // Prefer the title Claude Code's own UI shows for this session
   // (custom_title, else its auto-generated ai_title — see backend "title"
   // field), falling back to the project/folder name when neither exists.
-  const displayTitle = r.title || r.project || "unknown";
-  const showProjectInSub = !!(r.title && r.project);
+  const displayTitle = sessionDisplayName(r);
+  const showProjectInSub = !!((r.title || r.first_prompt) && r.project);
   const path = r.cwd || "";
   return { dateLabel, models, start, end, displayTitle, showProjectInSub, path };
 }

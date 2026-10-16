@@ -1,3 +1,19 @@
+# Local data
 *.sqlite3*
 *.log
-__pycache__
+legacy-python/backups/
+
+# Design review captures
+.impeccable/review/
+
+# Python
+__pycache__/
+
+# Swift / build output
+.build/
+.swiftpm/
+build/
+*.dmg
+
+# macOS
+.DS_Store

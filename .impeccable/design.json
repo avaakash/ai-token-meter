@@ -1,0 +1,866 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-16T00:00:00Z",
+  "title": "Design System: Usage",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Vibrancy Ground",
+        "canonical": "#f0f0f2",
+        "dark": "#1b1b1d",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424243",
+          "#616163",
+          "#828284",
+          "#a5a5a6",
+          "#c9c9ca",
+          "#eeeef0"
+        ],
+        "oklch": "oklch(95.6% 0.003 286.3)"
+      },
+      "sidebar": {
+        "role": "neutral",
+        "displayName": "Source List Grey",
+        "canonical": "#e7e7ea",
+        "dark": "#222225",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252527",
+          "#424244",
+          "#616163",
+          "#828285",
+          "#a5a5a7",
+          "#c9c9cb",
+          "#eeeef0"
+        ],
+        "oklch": "oklch(92.9% 0.004 286.3)"
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Panel White",
+        "canonical": "#ffffff",
+        "dark": "#262628",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ],
+        "oklch": "oklch(100.0% 0.000 89.9)"
+      },
+      "panel-2": {
+        "role": "neutral",
+        "displayName": "Inset Grey",
+        "canonical": "#f6f6f8",
+        "dark": "#2d2d30",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424243",
+          "#616162",
+          "#828284",
+          "#a5a5a6",
+          "#c9c9ca",
+          "#eeeef0"
+        ],
+        "oklch": "oklch(97.4% 0.003 286.4)"
+      },
+      "hair": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "rgba(0, 0, 0, 0.085)",
+        "dark": "rgba(255, 255, 255, 0.085)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "hair-strong": {
+        "role": "neutral",
+        "displayName": "Hairline Strong",
+        "canonical": "rgba(0, 0, 0, 0.14)",
+        "dark": "rgba(255, 255, 255, 0.15)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#1d1d1f",
+        "dark": "#f2f2f4",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252526",
+          "#424244",
+          "#616163",
+          "#828284",
+          "#a5a5a7",
+          "#c9c9cb",
+          "#eeeef0"
+        ],
+        "oklch": "oklch(23.2% 0.004 286.1)"
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Ink Secondary",
+        "canonical": "#4f4f55",
+        "dark": "#c2c2c8",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252529",
+          "#414146",
+          "#616166",
+          "#828288",
+          "#a4a4ab",
+          "#c8c8ce",
+          "#eeeef4"
+        ],
+        "oklch": "oklch(43.0% 0.010 286.0)"
+      },
+      "ink-3": {
+        "role": "neutral",
+        "displayName": "Ink Tertiary",
+        "canonical": "#6b6b71",
+        "dark": "#a0a0a8",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252529",
+          "#414146",
+          "#616166",
+          "#828288",
+          "#a4a4aa",
+          "#c8c8ce",
+          "#eeeef3"
+        ],
+        "oklch": "oklch(53.0% 0.009 286.1)"
+      },
+      "track": {
+        "role": "neutral",
+        "displayName": "Track",
+        "canonical": "#e5e5ea",
+        "dark": "#3a3a3f",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252528",
+          "#424245",
+          "#616165",
+          "#828286",
+          "#a4a4a9",
+          "#c9c9cd",
+          "#eeeef2"
+        ],
+        "oklch": "oklch(92.3% 0.007 286.3)"
+      },
+      "plan": {
+        "role": "primary",
+        "displayName": "Plan Blue",
+        "canonical": "#2a78d6",
+        "dark": "#3987e5",
+        "tonalRamp": [
+          "#000a20",
+          "#00244e",
+          "#004083",
+          "#145fb5",
+          "#3582e0",
+          "#63a7ff",
+          "#a6ccfe",
+          "#e5f0fe"
+        ],
+        "oklch": "oklch(57.5% 0.163 255.5)"
+      },
+      "plan-soft": {
+        "role": "primary",
+        "displayName": "Plan Blue Soft",
+        "canonical": "#b7d3f6",
+        "dark": "#1c5cab",
+        "tonalRamp": [
+          "#010b1c",
+          "#15263b",
+          "#2f435c",
+          "#4c6380",
+          "#6b85a4",
+          "#8ea7c6",
+          "#b4cce9",
+          "#e4f0fe"
+        ],
+        "oklch": "oklch(85.8% 0.057 254.1)"
+      },
+      "plan-ink": {
+        "role": "primary",
+        "displayName": "Plan Ink",
+        "canonical": "#1c5cab",
+        "dark": "#86b6ef",
+        "tonalRamp": [
+          "#000a21",
+          "#002350",
+          "#074081",
+          "#2761aa",
+          "#4483d5",
+          "#6ca7f6",
+          "#a7ccfe",
+          "#e4f0ff"
+        ],
+        "oklch": "oklch(48.0% 0.142 256.1)"
+      },
+      "plan-wash": {
+        "role": "primary",
+        "displayName": "Plan Wash",
+        "canonical": "rgba(42, 120, 214, 0.10)",
+        "dark": "rgba(57, 135, 229, 0.16)",
+        "tonalRamp": [
+          "#000a20",
+          "#00244e",
+          "#004083",
+          "#145fb5",
+          "#3582e0",
+          "#63a7ff",
+          "#a6ccfe",
+          "#e5f0fe"
+        ]
+      },
+      "warn": {
+        "role": "secondary",
+        "displayName": "Watch Amber",
+        "canonical": "#fab219",
+        "dark": "#fab219",
+        "tonalRamp": [
+          "#120900",
+          "#332100",
+          "#583c00",
+          "#805902",
+          "#ab7703",
+          "#d7980a",
+          "#fbbd51",
+          "#ffecce"
+        ],
+        "oklch": "oklch(81.1% 0.164 78.5)"
+      },
+      "warn-ink": {
+        "role": "secondary",
+        "displayName": "Watch Amber Ink",
+        "canonical": "#8a5a00",
+        "dark": "#f5c04a",
+        "tonalRamp": [
+          "#130900",
+          "#352000",
+          "#5b3a01",
+          "#83570a",
+          "#a9772e",
+          "#cb9b5b",
+          "#eec085",
+          "#feebd4"
+        ],
+        "oklch": "oklch(50.8% 0.108 73.3)"
+      },
+      "warn-wash": {
+        "role": "secondary",
+        "displayName": "Watch Amber Wash",
+        "canonical": "rgba(250, 178, 25, 0.16)",
+        "dark": "rgba(250, 178, 25, 0.14)",
+        "tonalRamp": [
+          "#120900",
+          "#332100",
+          "#583c00",
+          "#805902",
+          "#ab7703",
+          "#d7980a",
+          "#fbbd51",
+          "#ffecce"
+        ]
+      },
+      "crit": {
+        "role": "secondary",
+        "displayName": "Run-out Red",
+        "canonical": "#d03b3b",
+        "dark": "#d03b3b",
+        "tonalRamp": [
+          "#1f0001",
+          "#4d0006",
+          "#800010",
+          "#af2428",
+          "#db4745",
+          "#ff736c",
+          "#ffb3ab",
+          "#fee9e7"
+        ],
+        "oklch": "oklch(57.5% 0.186 25.2)"
+      },
+      "crit-ink": {
+        "role": "secondary",
+        "displayName": "Run-out Red Ink",
+        "canonical": "#b42a2a",
+        "dark": "#ff8a80",
+        "tonalRamp": [
+          "#1f0001",
+          "#4d0004",
+          "#80030e",
+          "#ab2c2b",
+          "#d74d47",
+          "#fa776e",
+          "#ffb3ab",
+          "#fee9e6"
+        ],
+        "oklch": "oklch(50.8% 0.175 26.1)"
+      },
+      "crit-wash": {
+        "role": "secondary",
+        "displayName": "Run-out Red Wash",
+        "canonical": "rgba(208, 59, 59, 0.10)",
+        "dark": "rgba(208, 59, 59, 0.18)",
+        "tonalRamp": [
+          "#1f0001",
+          "#4d0006",
+          "#800010",
+          "#af2428",
+          "#db4745",
+          "#ff736c",
+          "#ffb3ab",
+          "#fee9e7"
+        ]
+      },
+      "good-ink": {
+        "role": "secondary",
+        "displayName": "Synced Green",
+        "canonical": "#006300",
+        "dark": "#3ccf3c",
+        "tonalRamp": [
+          "#001000",
+          "#002f00",
+          "#015101",
+          "#277423",
+          "#469841",
+          "#6fba69",
+          "#98de92",
+          "#ccffc7"
+        ],
+        "oklch": "oklch(43.3% 0.147 142.5)"
+      },
+      "s1": {
+        "role": "tertiary",
+        "displayName": "Series 1",
+        "canonical": "#2a78d6",
+        "dark": "#3987e5",
+        "tonalRamp": [
+          "#000a20",
+          "#00244e",
+          "#004083",
+          "#145fb5",
+          "#3582e0",
+          "#63a7ff",
+          "#a6ccfe",
+          "#e5f0fe"
+        ],
+        "oklch": "oklch(57.5% 0.163 255.5)"
+      },
+      "s2": {
+        "role": "tertiary",
+        "displayName": "Series 2",
+        "canonical": "#eb6834",
+        "dark": "#d95926",
+        "tonalRamp": [
+          "#1b0300",
+          "#441200",
+          "#722502",
+          "#a43902",
+          "#d4541c",
+          "#f77d4f",
+          "#ffb59a",
+          "#feeae2"
+        ],
+        "oklch": "oklch(67.1% 0.175 40.6)"
+      },
+      "s3": {
+        "role": "tertiary",
+        "displayName": "Series 3",
+        "canonical": "#1baf7a",
+        "dark": "#199e70",
+        "tonalRamp": [
+          "#000f07",
+          "#012d1c",
+          "#024f34",
+          "#00744e",
+          "#049a6a",
+          "#47be8c",
+          "#79e2b1",
+          "#c3ffe0"
+        ],
+        "oklch": "oklch(66.9% 0.141 162.1)"
+      },
+      "s4": {
+        "role": "tertiary",
+        "displayName": "Series 4",
+        "canonical": "#eda100",
+        "dark": "#c98500",
+        "tonalRamp": [
+          "#130900",
+          "#342001",
+          "#5a3b00",
+          "#835703",
+          "#ae7506",
+          "#db950f",
+          "#fdbb57",
+          "#feebd2"
+        ],
+        "oklch": "oklch(76.4% 0.161 75.1)"
+      },
+      "s5": {
+        "role": "tertiary",
+        "displayName": "Series 5",
+        "canonical": "#e87ba4",
+        "dark": "#d55181",
+        "tonalRamp": [
+          "#1d000b",
+          "#490125",
+          "#711d42",
+          "#993b62",
+          "#c25a83",
+          "#e580a6",
+          "#feaec9",
+          "#fee8ee"
+        ],
+        "oklch": "oklch(71.6% 0.141 357.4)"
+      },
+      "s6": {
+        "role": "tertiary",
+        "displayName": "Series 6",
+        "canonical": "#008300",
+        "dark": "#008300",
+        "tonalRamp": [
+          "#001000",
+          "#002f00",
+          "#015101",
+          "#037703",
+          "#2e9b2a",
+          "#5fbe59",
+          "#8ae283",
+          "#ccffc7"
+        ],
+        "oklch": "oklch(52.9% 0.180 142.5)"
+      },
+      "heat-0": {
+        "role": "tertiary",
+        "displayName": "Heat Empty",
+        "canonical": "#ececf0",
+        "dark": "#303034",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252527",
+          "#424244",
+          "#616164",
+          "#828285",
+          "#a5a5a8",
+          "#c9c9cc",
+          "#eeeef1"
+        ],
+        "oklch": "oklch(94.4% 0.005 286.3)"
+      },
+      "heat-1": {
+        "role": "tertiary",
+        "displayName": "Heat 1",
+        "canonical": "#cde2fb",
+        "dark": "#184f95",
+        "tonalRamp": [
+          "#030c17",
+          "#192635",
+          "#354355",
+          "#526377",
+          "#71849b",
+          "#95a7bd",
+          "#b9cbe0",
+          "#e4f0fe"
+        ],
+        "oklch": "oklch(90.5% 0.041 252.8)"
+      },
+      "heat-2": {
+        "role": "tertiary",
+        "displayName": "Heat 2",
+        "canonical": "#86b6ef",
+        "dark": "#256abf",
+        "tonalRamp": [
+          "#000b1e",
+          "#032549",
+          "#1e436d",
+          "#3a6393",
+          "#5785bb",
+          "#7da8dd",
+          "#a3cdff",
+          "#e4f0fe"
+        ],
+        "oklch": "oklch(76.4% 0.097 253.2)"
+      },
+      "heat-3": {
+        "role": "tertiary",
+        "displayName": "Heat 3",
+        "canonical": "#3987e5",
+        "dark": "#3987e5",
+        "tonalRamp": [
+          "#000b1f",
+          "#00244e",
+          "#014081",
+          "#1360b4",
+          "#3582e0",
+          "#62a7fe",
+          "#a5ccff",
+          "#e4f0fe"
+        ],
+        "oklch": "oklch(62.2% 0.161 255.1)"
+      },
+      "heat-4": {
+        "role": "tertiary",
+        "displayName": "Heat 4",
+        "canonical": "#1c5cab",
+        "dark": "#86b6ef",
+        "tonalRamp": [
+          "#000a21",
+          "#002350",
+          "#074081",
+          "#2761aa",
+          "#4483d5",
+          "#6ca7f6",
+          "#a7ccfe",
+          "#e4f0ff"
+        ],
+        "oklch": "oklch(48.0% 0.142 256.1)"
+      },
+      "grid": {
+        "role": "neutral",
+        "displayName": "Chart Grid",
+        "canonical": "#e6e6ea",
+        "dark": "#343438",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252527",
+          "#424244",
+          "#616164",
+          "#828285",
+          "#a5a5a8",
+          "#c9c9cc",
+          "#eeeef1"
+        ],
+        "oklch": "oklch(92.6% 0.005 286.3)"
+      },
+      "axis": {
+        "role": "neutral",
+        "displayName": "Chart Axis",
+        "canonical": "#c4c4ca",
+        "dark": "#48484d",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#252528",
+          "#414146",
+          "#616166",
+          "#828287",
+          "#a4a4aa",
+          "#c8c8ce",
+          "#eeeef3"
+        ],
+        "oklch": "oklch(82.2% 0.008 286.2)"
+      },
+      "tip": {
+        "role": "neutral",
+        "displayName": "Tooltip Surface",
+        "canonical": "#ffffff",
+        "dark": "#303033",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ],
+        "oklch": "oklch(100.0% 0.000 89.9)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The big cost figure and projected-at-reset percentage; one per panel at most. 30px under 860px."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "View title at the top of each section."
+      },
+      "metric": {
+        "displayName": "Metric",
+        "purpose": "The % used figure on each allowance meter."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "Efficiency and fact cells."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Panel titles, source names, empty-state headings."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text, nav items, meter and session names."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Meta lines, meter footers, forecast notes, legends, controls."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Stat keys, table headers, nav group headers, counts; sentence case."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Session IDs, paths and commands only."
+      }
+    },
+    "themes": {
+      "light": ":root",
+      "dark": "@media (prefers-color-scheme: dark) :root:where(:not([data-theme=\"light\"])) and :root[data-theme=\"dark\"]; values in colorMeta.<token>.dark"
+    },
+    "shadows": [
+      {
+        "name": "hairline-ring",
+        "value": "0 0 0 1px var(--hair)",
+        "purpose": "Panels, sync button, code chips, tooltip edge. Replaces card shadows."
+      },
+      {
+        "name": "segment-pressed",
+        "value": "0 1px 2px rgba(0,0,0,0.08), 0 0 0 0.5px var(--hair)",
+        "purpose": "Selected option of a segmented control."
+      },
+      {
+        "name": "tooltip",
+        "value": "0 8px 28px rgba(20,20,30,0.16), 0 1px 3px rgba(20,20,30,0.08)",
+        "dark": "0 10px 30px rgba(0,0,0,0.5), 0 1px 3px rgba(0,0,0,0.4)",
+        "purpose": "Floating tooltip only."
+      },
+      {
+        "name": "focus-ring",
+        "value": "outline: 2px solid var(--plan); outline-offset: 2px",
+        "purpose": "Every focus-visible element; search uses box-shadow 0 0 0 2px var(--plan)."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-fill",
+        "value": "cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Meters, capacity bars and share bars filling in on the first load only; later renders snap."
+      },
+      {
+        "name": "duration-meter",
+        "value": "0.9s",
+        "purpose": "Allowance meter fill and projection width."
+      },
+      {
+        "name": "duration-capacity",
+        "value": "0.8s",
+        "purpose": "Capacity segment flex-grow and share bar width."
+      },
+      {
+        "name": "duration-hover",
+        "value": "0.15s ease",
+        "purpose": "Legend and chart hover highlight; capacity dim is 0.2s."
+      },
+      {
+        "name": "duration-tip",
+        "value": "0.12s ease",
+        "purpose": "Tooltip fade and 4px rise."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "transition-duration: 0s; animation-duration: 0s",
+        "purpose": "Applied under prefers-reduced-motion; figures jump to value."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "collapse-grids",
+        "value": "1180px"
+      },
+      {
+        "name": "sidebar-to-topbar",
+        "value": "860px"
+      }
+    ],
+    "layout": {
+      "sidebarWidth": "236px",
+      "viewMaxWidth": "1320px",
+      "overviewRatio": "1.45fr 1fr",
+      "secondRowRatio": "1.5fr 1fr"
+    }
+  },
+  "components": [
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Inset grouped panel on the grey ground; hairline ring, no shadow.",
+      "html": "<section class=\"ds-panel\"><div class=\"ds-panel-head\"><span class=\"ds-panel-title\">Recent sessions</span><span class=\"ds-panel-aside\">Last 7 days</span></div><div class=\"ds-panel-body\">Content sits 18px from the edge; rows are divided by hairlines.</div></section>",
+      "css": ".ds-panel { font: 13px/1.45 -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; background: var(--panel, #ffffff); color: var(--ink, #1d1d1f); border-radius: 12px; box-shadow: 0 0 0 1px var(--hair, rgba(0,0,0,0.085)); max-width: 420px; } .ds-panel-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px 0; } .ds-panel-title { font-size: 13.5px; font-weight: 650; } .ds-panel-aside { font-size: 12px; color: var(--ink-3, #6b6b71); } .ds-panel-body { padding: 14px 18px 18px; color: var(--ink-2, #4f4f55); }"
+    },
+    {
+      "name": "Source List Navigation",
+      "kind": "nav",
+      "refersTo": "nav-item",
+      "description": "Native sidebar source list; current page in plan wash with a blue icon.",
+      "html": "<nav class=\"ds-nav\"><div class=\"ds-nav-group\">Summary</div><a href=\"#\" class=\"ds-nav-item\" aria-current=\"page\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><rect x=\"3\" y=\"3\" width=\"6\" height=\"6\" rx=\"1.6\"/><rect x=\"11\" y=\"3\" width=\"6\" height=\"6\" rx=\"1.6\"/><rect x=\"3\" y=\"11\" width=\"6\" height=\"6\" rx=\"1.6\"/><rect x=\"11\" y=\"11\" width=\"6\" height=\"6\" rx=\"1.6\"/></svg><span>Overview</span></a><a href=\"#\" class=\"ds-nav-item\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><path d=\"M3.2 14.5a7 7 0 1 1 13.6 0\"/><path d=\"M10 12.5 13.2 7.6\"/><circle cx=\"10\" cy=\"12.8\" r=\"1.1\"/></svg><span>Limits</span><i class=\"ds-nav-dot\"></i></a></nav>",
+      "css": ".ds-nav { font: 13px/1.45 -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; display: flex; flex-direction: column; gap: 1px; width: 212px; padding: 12px; background: var(--sidebar, #e7e7ea); } .ds-nav-group { font-size: 11.5px; font-weight: 600; color: var(--ink-3, #6b6b71); padding: 0 10px 4px; } .ds-nav-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; color: var(--ink-2, #4f4f55); text-decoration: none; font-weight: 500; } .ds-nav-item:hover { background: var(--hair, rgba(0,0,0,0.085)); color: var(--ink, #1d1d1f); } .ds-nav-item:focus-visible { outline: 2px solid var(--plan, #2a78d6); outline-offset: 2px; } .ds-nav-item[aria-current=\"page\"] { background: var(--plan-wash, rgba(42,120,214,0.10)); color: var(--ink, #1d1d1f); font-weight: 600; } .ds-nav-item[aria-current=\"page\"] svg { color: var(--plan, #2a78d6); } .ds-nav-dot { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--crit, #d03b3b); }"
+    },
+    {
+      "name": "Segmented Control",
+      "kind": "chip",
+      "refersTo": "segmented",
+      "description": "Native segmented control for source, appearance and cost period.",
+      "html": "<div class=\"ds-seg\" role=\"group\" aria-label=\"Period\"><button>1d</button><button aria-pressed=\"true\">7d</button><button>1m</button><button>1y</button></div>",
+      "css": ".ds-seg { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: var(--hair, rgba(0,0,0,0.085)); font-family: -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; } .ds-seg button { border: 0; background: transparent; border-radius: 6px; padding: 5px 8px; min-width: 34px; font: inherit; font-size: 12px; font-weight: 550; color: var(--ink-2, #4f4f55); cursor: pointer; } .ds-seg button:hover { color: var(--ink, #1d1d1f); } .ds-seg button:focus-visible { outline: 2px solid var(--plan, #2a78d6); outline-offset: 2px; } .ds-seg button[aria-pressed=\"true\"] { background: var(--panel, #ffffff); color: var(--ink, #1d1d1f); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 0 0 0.5px var(--hair, rgba(0,0,0,0.085)); }"
+    },
+    {
+      "name": "Sync Button",
+      "kind": "button",
+      "refersTo": "button-sync",
+      "description": "The one standalone button: panel surface, hairline ring, leading icon.",
+      "html": "<button class=\"ds-btn-sync\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M16 8.2A6.3 6.3 0 0 0 4.6 6.4M4 11.8a6.3 6.3 0 0 0 11.4 1.8\"/><path d=\"M4.4 3.6v3h3M15.6 16.4v-3h-3\"/></svg><span>Sync now</span></button>",
+      "css": ".ds-btn-sync { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; padding: 6px 8px; font: 600 12px -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; background: var(--panel, #ffffff); color: var(--ink, #1d1d1f); box-shadow: 0 0 0 1px var(--hair, rgba(0,0,0,0.085)); cursor: pointer; } .ds-btn-sync:hover { box-shadow: 0 0 0 1px var(--hair-strong, rgba(0,0,0,0.14)); } .ds-btn-sync:focus-visible { outline: 2px solid var(--plan, #2a78d6); outline-offset: 2px; } .ds-btn-sync:active svg { transform: rotate(180deg); transition: transform 0.4s linear; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "Toolbar search with leading icon; ring turns plan blue on focus.",
+      "html": "<label class=\"ds-search\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><circle cx=\"8.8\" cy=\"8.8\" r=\"5.3\"/><path d=\"m12.8 12.8 3.9 3.9\"/></svg><input placeholder=\"Search sessions, projects, models\"></label>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 34px; width: 320px; background: var(--panel, #ffffff); border-radius: 9px; box-shadow: 0 0 0 1px var(--hair-strong, rgba(0,0,0,0.14)); color: var(--ink-3, #6b6b71); font: 13px -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; } .ds-search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink, #1d1d1f); } .ds-search input::placeholder { color: var(--ink-3, #6b6b71); } .ds-search:focus-within { box-shadow: 0 0 0 2px var(--plan, #2a78d6); }"
+    },
+    {
+      "name": "Allowance Meter",
+      "kind": "custom",
+      "refersTo": "meter-track",
+      "description": "Signature storage-meter bar: used fill, projection, unit ticks, now marker, reset footer.",
+      "html": "<div class=\"ds-meter\"><div class=\"ds-meter-head\"><span class=\"ds-meter-name\">Weekly limit</span><span class=\"ds-meter-value\"><span class=\"ds-lvl\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 3.4 17.3 16H2.7z\"/><path d=\"M10 8.2v3.6\"/><circle cx=\"10\" cy=\"13.9\" r=\"0.4\"/></svg> High</span><b>78%</b> used</span></div><div class=\"ds-meter-bar\"><span class=\"ds-meter-proj\" style=\"width:92%\"></span><span class=\"ds-meter-fill\" style=\"width:78%\"></span><span class=\"ds-meter-ticks\"><i style=\"left:14.29%\"></i><i style=\"left:28.57%\"></i><i style=\"left:42.86%\"></i><i style=\"left:57.14%\"></i><i style=\"left:71.43%\"></i><i style=\"left:85.71%\"></i></span><span class=\"ds-meter-now\" style=\"left:64%\"></span></div><div class=\"ds-meter-foot\"><span>Resets in <b>2.4 days</b> · Wed 3:30 PM</span><span>$336.99 at API rates</span></div><div class=\"ds-forecast\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M10 3.4 17.3 16H2.7z\"/><path d=\"M10 8.2v3.6\"/><circle cx=\"10\" cy=\"13.9\" r=\"0.4\"/></svg><span>On pace to finish the week near <b>92%</b>.</span></div></div>",
+      "css": ".ds-meter { font: 13px/1.45 -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; color: var(--ink, #1d1d1f); padding: 14px 18px; width: 460px; background: var(--panel, #ffffff); } .ds-meter-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 9px; } .ds-meter-name { font-weight: 600; } .ds-meter-value { color: var(--ink-2, #4f4f55); display: inline-flex; align-items: baseline; gap: 4px; } .ds-meter-value b { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; color: var(--ink, #1d1d1f); font-variant-numeric: tabular-nums; } .ds-lvl { display: inline-flex; align-items: center; gap: 4px; margin-right: 6px; font-size: 12px; font-weight: 650; color: var(--warn-ink, #8a5a00); } .ds-meter-bar { position: relative; height: 10px; border-radius: 5px; background: var(--track, #e5e5ea); overflow: hidden; margin: 3px 0; } .ds-meter-fill, .ds-meter-proj { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1); } .ds-meter-fill { background: var(--warn, #fab219); z-index: 2; } .ds-meter-proj { background: var(--plan-soft, #b7d3f6); z-index: 1; } .ds-meter-ticks i { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--panel, #ffffff); z-index: 3; } .ds-meter-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink, #1d1d1f); opacity: 0.55; z-index: 4; } .ds-meter-foot { display: flex; justify-content: space-between; margin-top: 8px; font-size: 12px; color: var(--ink-3, #6b6b71); } .ds-meter-foot b { color: var(--ink-2, #4f4f55); font-weight: 600; } .ds-forecast { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; background: var(--warn-wash, rgba(250,178,25,0.16)); color: var(--ink, #1d1d1f); } .ds-forecast svg { color: var(--warn-ink, #8a5a00); margin-top: 1px; }"
+    },
+    {
+      "name": "Capacity Bar with Legend",
+      "kind": "custom",
+      "refersTo": "capacity-bar",
+      "description": "Segmented share bar in series order with its mandatory labeled legend; hover isolates a segment.",
+      "html": "<div class=\"ds-cap-wrap\"><div class=\"ds-cap\"><span style=\"flex-grow:40;background:var(--s1, #2a78d6)\"></span><span style=\"flex-grow:32;background:var(--s2, #eb6834)\"></span><span style=\"flex-grow:18;background:var(--s3, #1baf7a)\"></span><span style=\"flex-grow:10;background:var(--ink-3, #6b6b71)\"></span></div><ul class=\"ds-legend\"><li><i style=\"background:var(--s1, #2a78d6)\"></i><span class=\"nm\">claude-opus</span><b>$165.47</b><span class=\"sh\">40%</span></li><li><i style=\"background:var(--s2, #eb6834)\"></i><span class=\"nm\">claude-sonnet</span><b>$134.43</b><span class=\"sh\">32%</span></li><li><i style=\"background:var(--s3, #1baf7a)\"></i><span class=\"nm\">gpt-codex</span><b>$74.10</b><span class=\"sh\">18%</span></li><li><i style=\"background:var(--ink-3, #6b6b71)\"></i><span class=\"nm\">Other (2)</span><b>$42.00</b><span class=\"sh\">10%</span></li></ul></div>",
+      "css": ".ds-cap-wrap { width: 380px; font: 12.5px -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; color: var(--ink, #1d1d1f); } .ds-cap { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; background: var(--track, #e5e5ea); } .ds-cap span { flex-basis: 0; transition: flex-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; } .ds-cap:hover span { opacity: 0.3; } .ds-cap span:hover { opacity: 1; } .ds-legend { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; } .ds-legend li { display: grid; grid-template-columns: 10px minmax(0,1fr) auto 44px; gap: 10px; align-items: center; padding: 4px 6px; margin: 0 -6px; border-radius: 6px; transition: background 0.15s ease; } .ds-legend li:hover { background: var(--panel-2, #f6f6f8); } .ds-legend i { width: 10px; height: 10px; border-radius: 3px; } .ds-legend .nm { color: var(--ink-2, #4f4f55); } .ds-legend b { font-weight: 600; font-variant-numeric: tabular-nums; } .ds-legend .sh { color: var(--ink-3, #6b6b71); text-align: right; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Cost Figure",
+      "kind": "custom",
+      "refersTo": "display",
+      "description": "Display-size API-equivalent cost with a neutral delta and estimate note.",
+      "html": "<div class=\"ds-cost\"><div class=\"ds-cost-fig\"><span class=\"big\">$416.00</span><span class=\"delta\">+48%% <span class=\"vs\">vs previous 7 days</span></span></div><div class=\"ds-cost-note\">What this usage would cost at API rates. Your subscription price doesn't change.</div></div>",
+      "css": ".ds-cost { font-family: -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; color: var(--ink, #1d1d1f); width: 400px; } .ds-cost-fig { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; } .ds-cost .big { font-size: 34px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.05; font-variant-numeric: tabular-nums; } .ds-cost .delta { font-size: 12.5px; font-weight: 600; color: var(--ink-2, #4f4f55); } .ds-cost .vs { font-weight: 400; color: var(--ink-3, #6b6b71); } .ds-cost-note { font-size: 12px; color: var(--ink-3, #6b6b71); margin-top: 4px; }"
+    },
+    {
+      "name": "Session Row",
+      "kind": "custom",
+      "refersTo": "list-row",
+      "description": "Named session with source glyph, meta line, tabular cost and relative time.",
+      "html": "<div class=\"ds-row\" tabindex=\"0\"><span class=\"ds-glyph\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\"><path d=\"M10 2.6v14.8M2.6 10h14.8M4.8 4.8l10.4 10.4M15.2 4.8 4.8 15.2\"/></svg></span><div class=\"ds-row-main\"><div class=\"ds-row-name\">Split billing module out of the monolith</div><div class=\"ds-row-meta\">atlas-api · 139 messages · claude-opus</div></div><div class=\"ds-row-end\"><div class=\"ds-row-cost\">$13.83</div><div class=\"ds-row-when\">just now</div></div></div>",
+      "css": ".ds-row { display: grid; grid-template-columns: 18px minmax(0,1fr) auto; gap: 12px; align-items: center; padding: 10px 18px; width: 440px; font: 13px/1.45 -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; color: var(--ink, #1d1d1f); background: var(--panel, #ffffff); border-top: 1px solid var(--hair, rgba(0,0,0,0.085)); cursor: pointer; } .ds-row:hover { background: var(--panel-2, #f6f6f8); } .ds-row:focus-visible { outline: 2px solid var(--plan, #2a78d6); outline-offset: 2px; } .ds-glyph { color: var(--ink-2, #4f4f55); display: grid; } .ds-row-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row-meta { font-size: 12px; color: var(--ink-3, #6b6b71); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-row-end { text-align: right; } .ds-row-cost { font-weight: 600; font-variant-numeric: tabular-nums; } .ds-row-when { font-size: 11.5px; color: var(--ink-3, #6b6b71); }"
+    },
+    {
+      "name": "Tooltip",
+      "kind": "custom",
+      "refersTo": "tooltip",
+      "description": "The only lifted surface: chart and capacity tooltip.",
+      "html": "<div class=\"ds-tip\"><div class=\"t\">Tue 13</div><div class=\"r\"><span><i style=\"background:var(--s1, #2a78d6)\"></i>Output</span><b>$41.20</b></div><div class=\"r\"><span>Total</span><b>$58.09</b></div></div>",
+      "css": ".ds-tip { display: inline-block; min-width: 150px; font: 12px -apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif; background: var(--tip, #ffffff); color: var(--ink, #1d1d1f); border-radius: 10px; padding: 9px 11px; box-shadow: 0 8px 28px rgba(20,20,30,0.16), 0 1px 3px rgba(20,20,30,0.08), 0 0 0 1px var(--hair, rgba(0,0,0,0.085)); transition: opacity 0.12s ease, transform 0.12s ease; } .ds-tip .t { font-weight: 650; margin-bottom: 4px; } .ds-tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2, #4f4f55); } .ds-tip .r b { color: var(--ink, #1d1d1f); font-weight: 600; font-variant-numeric: tabular-nums; } .ds-tip .r i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Data Plan Allowance",
+    "overview": "**Creative North Star: \"The Data Plan Allowance\"**\n\nThe subscription is an allowance, and the system is built to read like the storage meter in a Mac's settings: a native source-list sidebar on a vibrancy-grey ground, grouped inset panels sitting on that ground, and one recurring data form, the segmented capacity bar, that says how much is used, how much is projected, and how much is left. Cost sits beside headroom, never below it.\n\nDensity is that of a native utility, not a marketing dashboard. Body text is 13px, panels are separated by 16px, and metrics are grouped into hairline-divided cells inside one panel rather than broken out into a wall of separate KPI cards. Colour is almost absent: neutral greys carry structure, a single plan blue carries \"used\", and amber and red are held back for the moment an allowance actually runs short.\n\nLight and dark are equal citizens. Every token has a dark value (recorded in the sidecar) applied under `prefers-color-scheme: dark` and under an explicit `[data-theme=\"dark\"]`, with `[data-theme=\"light\"]` able to override the system. The page runs unchanged in a browser and in the macOS app's WKWebView, offline, so nothing depends on a webfont or a CDN.",
+    "keyCharacteristics": [
+      "Native macOS source-list sidebar (236px) on a grey ground; content in inset panels.",
+      "Segmented capacity bars are the one recurring data form.",
+      "One plan blue; amber and red are reserved status colours.",
+      "Hairline rings and separators, no card shadows.",
+      "System SF type, tabular figures for every number, SF Mono only for IDs.",
+      "Fills and figures animate into place; motion stops entirely under reduced motion."
+    ],
+    "rules": [
+      {
+        "name": "The One Blue Rule",
+        "body": "Plan blue is the only brand hue. It means \"used\" or \"selected\", nothing else; no second accent is introduced for emphasis.",
+        "section": "colors"
+      },
+      {
+        "name": "The Reserved Alarm Rule",
+        "body": "Amber appears only at ≥75% used or projected, red only at ≥90% or a projected run-out. Every status colour ships with an icon and a word (\"High\", \"Almost out\", the forecast sentence), never colour alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Neutral Money Rule",
+        "body": "Cost deltas are `ink-2` with a sign and \"vs previous period\". Spending more is not an error and spending less is not a success; money never takes a status colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The Labeled Series Rule",
+        "body": "Light slots s3 to s5 fall below 3:1 against white, so every categorical bar ships with a labeled legend (swatch, name, value, share) and hover-isolation. A series colour is never the only carrier of meaning.",
+        "section": "colors"
+      },
+      {
+        "name": "The Glyph Not Hue Rule",
+        "body": "Source identity is a monochrome SVG glyph in `ink-2` (asterisk for Claude, terminal for Codex), never a colour. Series colours describe models and token types, not sources.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number that can change (percentages, dollars, counts, durations) uses tabular figures so values do not jitter as they refresh.",
+        "section": "typography"
+      },
+      {
+        "name": "The Mono For IDs Rule",
+        "body": "Monospace is for identifiers, paths and commands. Model names, costs and labels stay in the system face.",
+        "section": "typography"
+      },
+      {
+        "name": "The Hairline Not Shadow Rule",
+        "body": "Panels are separated from the ground by tone and a 1px ring. If something needs to feel raised, it must actually float above the page (a tooltip); resting surfaces stay flat.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do express any quantity against a limit as a segmented capsule meter with used, projected and remaining parts.",
+      "Do keep plan blue as the only accent; use `plan-soft` for projections and `plan-wash` for selection.",
+      "Do switch a meter to amber at ≥75% and red at ≥90% or projected run-out, always with an icon and a word.",
+      "Do pair every categorical colour with a labeled legend, assigning s1 to s6 in rank order and \"Other\" in `ink-3`.",
+      "Do use tabular figures for every changing number and SF Mono only for IDs, paths and commands.",
+      "Do group related figures as hairline-divided cells inside one panel.",
+      "Do define every new colour token in both the light `:root` block and both dark blocks.",
+      "Do animate fills and figures with `cubic-bezier(0.16, 1, 0.3, 1)` and drop all motion under `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "Don't give panels drop shadows; use the 1px hairline ring.",
+      "Don't colour cost deltas or money green or red.",
+      "Don't identify Claude or Codex by colour; use the monochrome glyph.",
+      "Don't use amber or red for anything other than an allowance at risk, its limit line, or a failed sync.",
+      "Don't break metrics into a wall of separate KPI cards.",
+      "Don't load webfonts or external assets; the page must render offline in WKWebView."
+    ]
+  }
+}

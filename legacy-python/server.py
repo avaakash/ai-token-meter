@@ -188,6 +188,12 @@ def init_db():
             )
             """
         )
+        # app_title: a name kept outside the transcripts (the Claude desktop
+        # app's session metadata, Codex's session_index.jsonl), with
+        # app_title_source "user" when the person renamed it there.
+        _ensure_columns(conn, "session_titles", {
+            "app_title": "TEXT", "app_title_source": "TEXT", "first_prompt": "TEXT",
+        })
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS limit_snapshots (
@@ -285,6 +291,8 @@ def scan_all():
                 for pattern in module.LOG_GLOBS:
                     for path in glob.glob(pattern, recursive=True):
                         module.scan_file(conn, path, state)
+                module.sync_session_titles(conn)
+            ensure_first_prompts_current(conn)
             ensure_day_fields_current(conn)
             ensure_project_field_current(conn)
             # Full pricing-hash-triggered recompute only happens at startup
@@ -402,6 +410,50 @@ def ensure_day_fields_current(conn):
     conn.execute(
         "INSERT OR REPLACE INTO meta (key, value) VALUES ('day_fields_version', ?)",
         (str(DAY_FIELDS_VERSION),),
+    )
+
+
+# Bump this if the first-prompt rules change. On a bump, each log file is
+# re-read from the top only as far as its first prompt.
+FIRST_PROMPT_VERSION = 1
+
+
+def ensure_first_prompts_current(conn):
+    row = conn.execute("SELECT value FROM meta WHERE key = 'first_prompt_version'").fetchone()
+    if row and int(row[0]) >= FIRST_PROMPT_VERSION:
+        return
+    for module in SOURCES.values():
+        if hasattr(module, "backfill_first_prompts"):
+            module.backfill_first_prompts(conn)
+    conn.execute(
+        "INSERT OR REPLACE INTO meta (key, value) VALUES ('first_prompt_version', ?)",
+        (str(FIRST_PROMPT_VERSION),),
+    )
+
+
+def store_first_prompts(conn, rows):
+    """rows: (session_id, text). Keeps the first one ever recorded."""
+    conn.executemany(
+        """
+        INSERT INTO session_titles (session_id, first_prompt) VALUES (?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET first_prompt = excluded.first_prompt
+        WHERE session_titles.first_prompt IS NULL
+        """,
+        rows,
+    )
+
+
+def store_app_titles(conn, rows):
+    """rows: (session_id, title, source). Writes only rows that changed."""
+    conn.executemany(
+        """
+        INSERT INTO session_titles (session_id, app_title, app_title_source) VALUES (?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+            app_title = excluded.app_title, app_title_source = excluded.app_title_source
+        WHERE session_titles.app_title IS NOT excluded.app_title
+           OR session_titles.app_title_source IS NOT excluded.app_title_source
+        """,
+        rows,
     )
 
 
@@ -1535,6 +1587,17 @@ def delete_weekly_usage_window(source, window_start):
 # ---------------------------------------------------------------------------
 
 
+# A rename made in an app outranks one recorded in the transcript (the app
+# can rename a session whose CLI isn't running, which never reaches the log);
+# generated titles come after any rename; the first prompt is returned
+# separately so the UI can present it as a quote rather than a title.
+SESSION_TITLE_COLUMNS = """
+                (SELECT COALESCE(CASE WHEN st.app_title_source = 'user' THEN st.app_title END,
+                                 st.custom_title, st.app_title, st.ai_title)
+                 FROM session_titles st WHERE st.session_id = messages.session_id) AS title,
+                (SELECT st.first_prompt FROM session_titles st WHERE st.session_id = messages.session_id) AS first_prompt"""
+
+
 def _where(source, *extra):
     """Builds a WHERE clause with the source filter FIRST, extra conditions
     after — callers that pass their own placeholder-bearing extra conditions
@@ -1698,7 +1761,7 @@ def build_usage_payload(source="all"):
             where_params,
         ).fetchall()
 
-        session_cols = """
+        session_cols = f"""
                 session_id, source,
                 (SELECT project FROM messages m2 WHERE m2.session_id = messages.session_id ORDER BY m2.timestamp ASC LIMIT 1) AS project,
                 (SELECT cwd FROM messages m2 WHERE m2.session_id = messages.session_id ORDER BY m2.timestamp ASC LIMIT 1) AS cwd,
@@ -1716,7 +1779,7 @@ def build_usage_payload(source="all"):
                 COALESCE(SUM(cost_cache_read), 0) AS cost_cache_read,
                 COALESCE(SUM(cost_cache_write), 0) AS cost_cache_write,
                 GROUP_CONCAT(DISTINCT model) AS models,
-                (SELECT COALESCE(custom_title, ai_title) FROM session_titles st WHERE st.session_id = messages.session_id) AS title
+                {SESSION_TITLE_COLUMNS}
         """
         session_where_sql, session_where_params = _where(source, "session_id IS NOT NULL")
 
@@ -1854,7 +1917,7 @@ def find_sessions(query, source="all", limit=20):
                 COALESCE(SUM(cache_5m_tokens + cache_1h_tokens), 0) AS cache_write_tokens,
                 COALESCE(SUM(cost), 0) AS cost,
                 GROUP_CONCAT(DISTINCT model) AS models,
-                (SELECT COALESCE(custom_title, ai_title) FROM session_titles st WHERE st.session_id = messages.session_id) AS title
+                {SESSION_TITLE_COLUMNS}
             FROM messages
             {where_sql}
             GROUP BY session_id
@@ -1909,7 +1972,7 @@ def list_all_sessions(source="all"):
                 COALESCE(SUM(cache_5m_tokens + cache_1h_tokens), 0) AS cache_write_tokens,
                 COALESCE(SUM(cost), 0) AS cost,
                 GROUP_CONCAT(DISTINCT model) AS models,
-                (SELECT COALESCE(custom_title, ai_title) FROM session_titles st WHERE st.session_id = messages.session_id) AS title
+                {SESSION_TITLE_COLUMNS}
             FROM messages
             {where_sql}
             GROUP BY session_id

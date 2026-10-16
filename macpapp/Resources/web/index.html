@@ -1,0 +1,1699 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Meter</title>
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #f0f0f2;
+    --sidebar: #e7e7ea;
+    --panel: #ffffff;
+    --panel-2: #f6f6f8;
+    --hair: rgba(0, 0, 0, 0.085);
+    --hair-strong: rgba(0, 0, 0, 0.14);
+    --ink: #1d1d1f;
+    --ink-2: #4f4f55;
+    --ink-3: #6b6b71;
+    --track: #e5e5ea;
+    --plan: #2a78d6;
+    --plan-soft: #b7d3f6;
+    --plan-ink: #1c5cab;
+    --plan-wash: rgba(42, 120, 214, 0.10);
+    --warn: #fab219;
+    --warn-ink: #8a5a00;
+    --warn-wash: rgba(250, 178, 25, 0.16);
+    --crit: #d03b3b;
+    --crit-ink: #b42a2a;
+    --crit-wash: rgba(208, 59, 59, 0.10);
+    --good-ink: #006300;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300;
+    --heat-0: #ececf0; --heat-1: #cde2fb; --heat-2: #86b6ef; --heat-3: #3987e5; --heat-4: #1c5cab;
+    --grid: #e6e6ea;
+    --axis: #c4c4ca;
+    --tip: #ffffff;
+    --tip-shadow: 0 8px 28px rgba(20, 20, 30, 0.16), 0 1px 3px rgba(20, 20, 30, 0.08);
+    --radius: 12px;
+    --side-w: 236px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --ground: #1b1b1d; --sidebar: #222225; --panel: #262628; --panel-2: #2d2d30;
+      --hair: rgba(255, 255, 255, 0.085); --hair-strong: rgba(255, 255, 255, 0.15);
+      --ink: #f2f2f4; --ink-2: #c2c2c8; --ink-3: #a0a0a8;
+      --track: #3a3a3f; --plan: #3987e5; --plan-soft: #1c5cab; --plan-ink: #86b6ef; --plan-wash: rgba(57, 135, 229, 0.16);
+      --warn: #fab219; --warn-ink: #f5c04a; --warn-wash: rgba(250, 178, 25, 0.14);
+      --crit: #d03b3b; --crit-ink: #ff8a80; --crit-wash: rgba(208, 59, 59, 0.18);
+      --good-ink: #3ccf3c;
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+      --heat-0: #303034; --heat-1: #184f95; --heat-2: #256abf; --heat-3: #3987e5; --heat-4: #86b6ef;
+      --grid: #343438; --axis: #48484d; --tip: #303033;
+      --tip-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ground: #1b1b1d; --sidebar: #222225; --panel: #262628; --panel-2: #2d2d30;
+    --hair: rgba(255, 255, 255, 0.085); --hair-strong: rgba(255, 255, 255, 0.15);
+    --ink: #f2f2f4; --ink-2: #c2c2c8; --ink-3: #a0a0a8;
+    --track: #3a3a3f; --plan: #3987e5; --plan-soft: #1c5cab; --plan-ink: #86b6ef; --plan-wash: rgba(57, 135, 229, 0.16);
+    --warn: #fab219; --warn-ink: #f5c04a; --warn-wash: rgba(250, 178, 25, 0.14);
+    --crit: #d03b3b; --crit-ink: #ff8a80; --crit-wash: rgba(208, 59, 59, 0.18);
+    --good-ink: #3ccf3c;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300;
+    --heat-0: #303034; --heat-1: #184f95; --heat-2: #256abf; --heat-3: #3987e5; --heat-4: #86b6ef;
+    --grid: #343438; --axis: #48484d; --tip: #303033;
+    --tip-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 13px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  }
+  ::selection { background: var(--plan-wash); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--plan); outline-offset: 2px; border-radius: 6px; }
+  button { font: inherit; color: inherit; }
+  a { color: var(--plan-ink); text-underline-offset: 3px; }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12px; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ink-3); }
+  .icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---------- Shell ---------- */
+  .app { display: grid; grid-template-columns: var(--side-w) minmax(0, 1fr); min-height: 100vh; }
+  .sidebar {
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: var(--sidebar); border-right: 1px solid var(--hair);
+    padding: 18px 12px 14px; display: flex; flex-direction: column; gap: 18px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 0; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 8px; background: var(--ink); color: var(--panel); display: grid; place-items: center; }
+  .brand-mark .icon { width: 18px; height: 18px; stroke-width: 1.8; }
+  .brand-name { font-size: 15px; font-weight: 650; letter-spacing: -0.01em; }
+  .brand-sub { font-size: 11.5px; color: var(--ink-3); }
+
+  .nav { display: flex; flex-direction: column; gap: 1px; }
+  .nav a {
+    display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px;
+    color: var(--ink-2); text-decoration: none; font-weight: 500; font-size: 13px;
+  }
+  .nav a:hover { background: var(--hair); color: var(--ink); }
+  .nav a[aria-current="page"] { background: var(--plan-wash); color: var(--ink); font-weight: 600; }
+  .nav-group { font-size: 11.5px; font-weight: 600; color: var(--ink-3); padding: 12px 10px 4px; }
+  .nav-group:first-child { padding-top: 0; }
+  .nav a[aria-current="page"] .icon { color: var(--plan); }
+  .nav .count { margin-left: auto; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+  .nav-alert { margin-left: auto; width: 7px; height: 7px; border-radius: 50%; background: var(--crit); }
+  .nav-alert.warn { background: var(--warn); }
+
+  .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 14px; padding: 0 4px; }
+  .side-label { font-size: 11.5px; color: var(--ink-3); margin: 0 4px 6px; }
+  .seg { display: flex; background: var(--hair); border-radius: 8px; padding: 2px; gap: 2px; }
+  .seg button {
+    flex: 1; border: 0; background: transparent; border-radius: 6px; padding: 5px 8px; cursor: pointer;
+    font-size: 12px; font-weight: 550; color: var(--ink-2); display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  }
+  .seg button:hover { color: var(--ink); }
+  .seg button[aria-pressed="true"] { background: var(--panel); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,0.08), 0 0 0 0.5px var(--hair); }
+  .seg.compact button { padding: 4px 7px; }
+  .seg button { white-space: nowrap; }
+
+  .sync { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 10px; background: var(--hair); }
+  .sync-line { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); }
+  .sync-line .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good-ink); flex: none; }
+  .sync-line .dot.off { background: var(--ink-3); }
+  .sync-line .dot.err { background: var(--crit); }
+  .sync-btn {
+    margin-top: 2px; border: 0; border-radius: 7px; padding: 6px 8px; cursor: pointer; background: var(--panel);
+    font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    box-shadow: 0 0 0 1px var(--hair);
+  }
+  .sync-btn:hover { box-shadow: 0 0 0 1px var(--hair-strong); }
+  .sync-btn.spinning .icon { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .side-select {
+    width: 100%; font: inherit; font-size: 12px; color: var(--ink-2); background: transparent;
+    border: 1px solid var(--hair-strong); border-radius: 7px; padding: 5px 8px;
+  }
+
+  /* ---------- Main ---------- */
+  .main { min-width: 0; padding: 24px 32px 56px; }
+  .view { max-width: 1880px; margin: 0 auto; }
+  .view[hidden] { display: none; }
+  .view-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+  .view-head h1 { font-size: 22px; font-weight: 650; letter-spacing: -0.015em; margin: 0; }
+  .view-head .sub { color: var(--ink-3); font-size: 12.5px; margin-top: 2px; }
+  .period button { min-width: 34px; }
+
+  .grid { display: grid; gap: 16px; }
+  .grid + .grid, .grid + .panel, .panel + .grid, .panel + .panel { margin-top: 16px; }
+  .g-overview { grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); }
+  .g-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .g-3-2 { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); }
+  .stack { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+  .panel { background: var(--panel); border-radius: var(--radius); box-shadow: 0 0 0 1px var(--hair); min-width: 0; }
+  /* Grid and stack gaps already space these; the sibling margin is for plain view flow. */
+  .grid > .panel, .stack > .panel, .grid > .stack { margin-top: 0; }
+  .panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px 0; }
+  .panel-head.wrap { flex-wrap: wrap; gap: 10px 12px; }
+  .panel-title { display: flex; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 650; }
+  .panel-title .icon { color: var(--ink-3); }
+  .panel-aside { font-size: 12px; color: var(--ink-3); }
+  .panel-body { padding: 14px 18px 18px; }
+  .rows > * + * { border-top: 1px solid var(--hair); }
+  .link-btn { border: 0; background: none; padding: 0; cursor: pointer; color: var(--plan-ink); font-size: 12px; font-weight: 550; }
+  .link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ---------- Allowance meters ---------- */
+  .meter { padding: 14px 18px; }
+  .meter-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 9px; }
+  .meter-name { font-size: 13px; font-weight: 600; }
+  .meter-value { font-size: 13px; color: var(--ink-2); white-space: nowrap; display: inline-flex; align-items: baseline; gap: 4px; }
+  .meter-value b { font-size: 20px; font-weight: 650; color: var(--ink); letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+  .meter-bar { position: relative; height: 10px; border-radius: 5px; background: var(--track); overflow: hidden; }
+  .meter-fill, .meter-proj {
+    position: absolute; left: 0; top: 0; bottom: 0; border-radius: 5px; width: 0;
+    transition: width 0.9s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .meter-fill { background: var(--plan); z-index: 2; }
+  .meter-proj { background: var(--plan-soft); z-index: 1; }
+  .meter[data-level="warn"] .meter-fill { background: var(--warn); }
+  .meter[data-level="crit"] .meter-fill { background: var(--crit); }
+  .meter[data-proj="over"] .meter-proj { background: var(--crit-wash); box-shadow: inset 0 0 0 1px var(--crit-wash); }
+  .meter-ticks { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
+  .meter-ticks i { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--panel); }
+  .meter-wrap { position: relative; padding: 3px 0; }
+  .meter-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--ink); opacity: 0.55; z-index: 4; }
+  .lvl { display: inline-flex; align-items: baseline; gap: 4px; margin-right: 6px; font-size: 12px; font-weight: 650; }
+  .lvl .icon { align-self: center; }
+  .lvl .icon { width: 14px; height: 14px; }
+  .lvl.warn { color: var(--warn-ink); }
+  .lvl.crit { color: var(--crit-ink); }
+  .meter-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 8px; font-size: 12px; color: var(--ink-3); flex-wrap: wrap; }
+  .meter-foot b { color: var(--ink-2); font-weight: 600; }
+  .forecast { display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 8px 10px; border-radius: 8px; font-size: 12.5px; color: var(--ink-2); background: var(--panel-2); }
+  .forecast .icon { margin-top: 1px; color: var(--ink-3); }
+  .forecast.crit { background: var(--crit-wash); color: var(--ink); }
+  .forecast.crit .icon { color: var(--crit-ink); }
+  .forecast.warn { background: var(--warn-wash); color: var(--ink); }
+  .forecast.warn .icon { color: var(--warn-ink); }
+  .forecast b { font-weight: 650; }
+  .source-head { display: flex; align-items: center; gap: 8px; padding: 14px 18px 4px; }
+  .source-head .name { font-size: 13.5px; font-weight: 650; }
+  .source-head .plan { font-size: 12px; color: var(--ink-3); }
+  .source-head .aside { margin-left: auto; font-size: 12px; color: var(--ink-3); }
+  .glyph { width: 18px; height: 18px; color: var(--ink-2); flex: none; }
+
+  .empty-state { padding: 22px 18px; color: var(--ink-2); font-size: 12.5px; }
+  .empty-state h3 { margin: 0 0 4px; font-size: 13.5px; color: var(--ink); }
+  .empty-state ol { margin: 8px 0 0; padding-left: 18px; }
+  .empty-state li { margin: 3px 0; }
+  .empty-state code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 11.5px; background: var(--panel-2); border-radius: 4px; padding: 1px 5px; box-shadow: 0 0 0 1px var(--hair); }
+
+  /* ---------- Cost ---------- */
+  .cost-figure { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .cost-figure .big { font-size: 34px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.05; }
+  .delta { font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 3px; }
+  .delta.up, .delta.down { color: var(--ink-2); }
+  .delta .vs { font-weight: 400; color: var(--ink-3); }
+  .cost-note { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+  .cost-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; border-top: 1px solid var(--hair); }
+  .cost-stats > div { padding: 10px 0 0; }
+  .cost-stats > div + div { padding-left: 12px; border-left: 1px solid var(--hair); }
+  .stat-k { font-size: 11.5px; color: var(--ink-3); }
+  .stat-v { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 1px; }
+
+  .src-split { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding: 12px 0 2px; border-top: 1px solid var(--hair); }
+  .src-row { display: grid; grid-template-columns: 18px 64px minmax(0, 1fr) auto 40px; align-items: center; gap: 10px; font-size: 12.5px; }
+  .src-name { font-weight: 600; }
+  .src-val { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .src-share { color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+  .capacity { display: flex; gap: 2px; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 16px; background: var(--track); }
+  .capacity span { height: 100%; flex: 0 1 0; transition: flex-grow 0.8s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease; min-width: 0; }
+  .capacity:hover span, .capacity.focus span { opacity: 0.3; }
+  .capacity span:hover, .capacity span.lit { opacity: 1 !important; }
+  .legend { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+  .legend li { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 44px; align-items: center; gap: 10px; padding: 4px 6px; margin: 0 -6px; border-radius: 6px; font-size: 12.5px; transition: background 0.15s ease; }
+  .legend li.lit { background: var(--panel-2); }
+  .legend .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .legend .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+  .legend .vl { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .legend .sh { color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Charts ---------- */
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart .gridline { stroke: var(--grid); stroke-width: 1; shape-rendering: crispEdges; }
+  .chart .baseline { stroke: var(--axis); stroke-width: 1; shape-rendering: crispEdges; }
+  .chart .tick { fill: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums; }
+  .chart .bar { transition: opacity 0.15s ease; }
+  .chart .hit { fill: transparent; cursor: default; }
+  .chart .col:hover .bar { opacity: 0.8; }
+  .chart .col:hover .hit { fill: var(--plan-wash); }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 10px; font-size: 12px; color: var(--ink-2); }
+  .chart-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .chart-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+  .tip {
+    position: fixed; z-index: 50; pointer-events: none; min-width: 150px; max-width: 280px;
+    background: var(--tip); color: var(--ink); border-radius: 10px; padding: 9px 11px; font-size: 12px;
+    box-shadow: var(--tip-shadow), 0 0 0 1px var(--hair); opacity: 0; transform: translateY(4px);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+  .tip.on { opacity: 1; transform: none; }
+  .tip .t { font-weight: 650; margin-bottom: 4px; }
+  .tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink-2); }
+  .tip .r b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tip .r i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 6px; }
+
+  /* ---------- Lists & tables ---------- */
+  .list-row { display: grid; align-items: center; gap: 12px; padding: 10px 18px; min-width: 0; }
+  .session-row { grid-template-columns: 18px minmax(0, 1fr) auto; cursor: pointer; }
+  .session-row:hover { background: var(--panel-2); }
+  .s-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .s-name.untitled { font-weight: 500; color: var(--ink-2); }
+  .s-name .q { color: var(--ink-3); font-weight: 400; }
+  .s-meta { font-size: 12px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 1px; }
+  .s-cost { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+  .s-when { font-size: 11.5px; color: var(--ink-3); text-align: right; }
+
+  .eff { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .eff.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .activity .eff { border-top: 1px solid var(--hair); }
+  .activity-grid { display: grid; grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); gap: 28px; align-items: end; }
+  .activity-foot { padding: 0 18px 12px; }
+  .activity-foot .scale { margin-top: 0; }
+  .stack.fill > :last-child { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .stack.fill > :last-child > .panel-body, .stack.fill > :last-child > .rows { flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
+  .chart.fill { flex: 1 1 auto; min-height: 170px; }
+  .chart.fill svg { position: absolute; inset: 0; }
+  .weeks-panel { display: flex; flex-direction: column; }
+  .weeks-panel .panel-body { flex: 1; display: flex; flex-direction: column; }
+  .weeks-panel .weeks { flex: 1; height: auto; min-height: 92px; }
+  .weeks-panel .wk-bar { flex: 1; height: auto; min-height: 50px; }
+  .eff > div { padding: 14px 18px; min-width: 0; }
+  .eff > div + div { border-left: 1px solid var(--hair); }
+  .eff .stat-v { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+  .eff .stat-s { font-size: 11.5px; color: var(--ink-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .search {
+    flex: 1; min-width: 220px; display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 34px;
+    background: var(--panel); border-radius: 9px; box-shadow: 0 0 0 1px var(--hair-strong); color: var(--ink-3);
+  }
+  .search input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink); height: 100%; }
+  .search input::placeholder { color: var(--ink-3); }
+  .search:focus-within { box-shadow: 0 0 0 2px var(--plan); }
+  .result-count { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+
+  table.data { width: 100%; border-collapse: collapse; }
+  table.data th {
+    text-align: left; font-weight: 600; font-size: 11.5px; color: var(--ink-3); padding: 11px 12px; border-bottom: 1px solid var(--hair);
+    white-space: nowrap; user-select: none;
+  }
+  table.data th.sortable { cursor: pointer; }
+  table.data th.sortable:hover { color: var(--ink); }
+  table.data th[aria-sort] { color: var(--ink); }
+  table.data th .arrow { display: inline-block; width: 10px; margin-left: 3px; color: var(--plan); }
+  table.data td { padding: 10px 12px; border-bottom: 1px solid var(--hair); vertical-align: middle; }
+  table.data tr:last-child td { border-bottom: 0; }
+  table.data td.r, table.data th.r { text-align: right; }
+  table.data td.r { font-variant-numeric: tabular-nums; }
+  table.data tbody tr { cursor: pointer; }
+  table.data tbody tr:hover td { background: var(--panel-2); }
+  table.data tbody tr[aria-selected="true"] td { background: var(--plan-wash); }
+  table.data th:first-child, table.data td:first-child { padding-left: 18px; }
+  table.data th:last-child, table.data td:last-child { padding-right: 18px; }
+  .name-cell { max-width: 460px; min-width: 220px; }
+  .src { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-2); font-size: 12px; white-space: nowrap; }
+  .src .glyph { width: 15px; height: 15px; }
+  .table-wrap { overflow-x: auto; }
+  .more-row { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--hair); }
+
+  .sessions-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
+  .back-link { border: 0; background: none; padding: 0; margin: 0 0 8px; cursor: pointer; color: var(--plan-ink); font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
+  .back-link .icon { width: 14px; height: 14px; }
+  .transcript-title { overflow-wrap: anywhere; }
+  .transcript-sub { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .transcript-sub .glyph { width: 14px; height: 14px; }
+  .transcript-total { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .transcript-total .big { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; }
+  .turns > * + * { border-top: 1px solid var(--hair); }
+  .turns { margin-top: 10px; }
+  .turn { padding: 14px 18px 16px; scroll-margin-top: 80px; }
+  .turn.flash { animation: turn-flash 1.4s ease-out; }
+  @keyframes turn-flash { from { background: var(--plan-wash); } to { background: transparent; } }
+  .turn-head { display: flex; align-items: baseline; gap: 10px; }
+  .turn-n { font-weight: 650; color: var(--ink-3); font-variant-numeric: tabular-nums; min-width: 30px; }
+  .turn-when { color: var(--ink-3); font-size: 12px; }
+  .turn-cost { margin-left: auto; font-weight: 650; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .turn-bar { height: 4px; border-radius: 2px; background: var(--track); overflow: hidden; margin: 8px 0 10px; }
+  .turn-bar span { display: block; height: 100%; width: 0; background: var(--plan); border-radius: 2px; }
+  .turn-prompt { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13.5px; line-height: 1.5; max-width: 900px; }
+  .turn-prompt.command { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  .turn-prompt.none { color: var(--ink-3); }
+  .turn-meta { margin-top: 8px; font-size: 12px; color: var(--ink-3); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip { font-size: 11.5px; padding: 2px 8px; border-radius: 6px; background: var(--panel-2); box-shadow: 0 0 0 1px var(--hair); color: var(--ink-2); }
+  .turn-response summary { cursor: pointer; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--plan-ink); width: fit-content; }
+  .turn-response-body { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: var(--panel-2); font-size: 12.5px; line-height: 1.5; color: var(--ink-2); max-height: 340px; overflow: auto; max-width: 900px; }
+  .carried { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; font-size: 12.5px; color: var(--ink-3); background: var(--panel-2); }
+  .kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 7px 12px; font-size: 12.5px; }
+  .kv dt { color: var(--ink-3); }
+  .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+  .copy { border: 0; background: none; color: var(--plan-ink); cursor: pointer; padding: 0 0 0 6px; font-size: 12px; }
+
+  .share-row { grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 90px; }
+  .share-bar { height: 8px; border-radius: 4px; background: var(--track); overflow: hidden; }
+  .share-bar span { display: block; height: 100%; border-radius: 4px; background: var(--plan); width: 0; transition: width 0.8s cubic-bezier(0.16, 1, 0.3, 1); }
+  .share-meta { font-size: 12px; color: var(--ink-3); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ---------- Heat grids ---------- */
+  .heat { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); grid-template-rows: repeat(7, 1fr); gap: 2px; }
+  .heat-scroll { overflow-x: auto; scrollbar-width: thin; }
+  .heat i, .hw i { display: block; aspect-ratio: 1; border-radius: 3px; background: var(--heat-0); }
+  .heat i.out { visibility: hidden; }
+  .heat-wrap { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 6px; }
+  .heat-days { display: grid; grid-template-rows: repeat(7, 1fr); gap: 2px; font-size: 10.5px; color: var(--ink-3); }
+  .heat-days span { display: flex; align-items: center; }
+  .heat-months { position: relative; height: 16px; font-size: 10.5px; color: var(--ink-3); margin-left: 34px; }
+  .heat-months span { position: absolute; top: 0; }
+  .scale { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--ink-3); justify-content: flex-end; margin-top: 12px; }
+  .scale i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+  .hw { display: grid; grid-template-columns: 34px repeat(24, minmax(0, 1fr)); gap: 3px; align-items: center; font-size: 10.5px; color: var(--ink-3); }
+  .hw .hl { text-align: center; }
+  .facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .facts > div { padding: 14px 18px; }
+  .facts > div:nth-child(even) { border-left: 1px solid var(--hair); }
+  .facts > div:nth-child(n+3) { border-top: 1px solid var(--hair); }
+  .facts .stat-v { font-size: 17px; font-weight: 650; }
+
+  /* ---------- Limits view ---------- */
+  .window-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .window-grid > .window + .window { border-left: 1px solid var(--hair); }
+  .window-grid.single { grid-template-columns: minmax(0, 1fr); }
+  .window { min-width: 0; padding-bottom: 6px; }
+  .mini { display: flex; align-items: flex-end; gap: 4px; height: 64px; margin: 4px 18px 0; }
+  .mini .mcol { flex: 1; display: flex; flex-direction: column; align-items: stretch; justify-content: flex-end; height: 100%; min-width: 0; }
+  .mini .mbar { background: var(--plan); border-radius: 4px 4px 0 0; min-height: 2px; }
+  .mini .mbar.future { background: var(--track); min-height: 2px; }
+  .mini-x { display: flex; gap: 4px; margin: 4px 18px 0; font-size: 10.5px; color: var(--ink-3); }
+  .mini-x span { flex: 1; text-align: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+  .window-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; padding: 12px 18px 12px; font-size: 12px; }
+  .window-facts .stat-v { font-size: 13.5px; }
+  .weeks { display: flex; align-items: flex-end; gap: 8px; height: 92px; padding: 0 18px; }
+  .weeks .wk { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; height: 100%; justify-content: flex-end; min-width: 0; }
+  .weeks .wk-bar { width: 100%; max-width: 38px; background: var(--track); border-radius: 5px; position: relative; height: 66px; overflow: hidden; }
+  .weeks .wk-bar span { position: absolute; left: 0; right: 0; bottom: 0; background: var(--plan); border-radius: 5px; }
+  .weeks .wk.current .wk-bar span { background: var(--plan-soft); }
+  .weeks .wk.current .wk-label { color: var(--ink-2); font-weight: 600; }
+  .weeks .wk-label { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; }
+  .weeks .wk-val { font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .range-bar { position: relative; height: 26px; margin: 8px 0 4px; }
+  .range-bar .rb-track { position: absolute; left: 0; right: 0; top: 10px; height: 6px; border-radius: 3px; background: var(--track); }
+  .range-bar .rb-band { position: absolute; top: 10px; height: 6px; border-radius: 3px; background: var(--plan-soft); }
+  .range-bar .rb-now, .range-bar .rb-mid, .range-bar .rb-limit { position: absolute; top: 4px; width: 2px; height: 18px; margin-left: -1px; border-radius: 1px; }
+  .range-bar .rb-now { background: var(--plan); }
+  .range-bar .rb-mid { background: var(--ink); }
+  .range-bar .rb-limit { background: var(--crit); }
+  .range-labels { position: relative; height: 16px; font-size: 11px; color: var(--ink-3); }
+  .range-labels span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+  .note { font-size: 12px; color: var(--ink-3); line-height: 1.5; }
+
+  .sample-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-2); background: var(--hair); padding: 3px 8px; border-radius: 6px; font-weight: 600; }
+
+  /* ---------- Responsive ---------- */
+  @media (max-width: 1180px) {
+    .g-overview, .g-3-2 { grid-template-columns: minmax(0, 1fr); }
+    /* One column: limits, then cost, then the chart and recent sessions. */
+    .g-overview > .stack { display: contents; }
+    .g-overview .ov-cost { order: 1; }
+    .g-overview .ov-chart { order: 2; }
+    .g-overview .ov-recent { order: 3; }
+    .eff { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .eff > div:nth-child(4) { border-left: 0; }
+    .eff > div:nth-child(n+4) { border-top: 1px solid var(--hair); }
+    .eff.four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .eff.four > div:nth-child(n) { border-left: 0; border-top: 0; }
+    .eff.four > div:nth-child(even) { border-left: 1px solid var(--hair); }
+    .eff.four > div:nth-child(n+3) { border-top: 1px solid var(--hair); }
+    .activity-grid { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .heat-inner { min-width: 680px; }
+  }
+  @media (max-width: 860px) {
+    .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+    .sidebar { position: sticky; z-index: 20; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; align-content: start; gap: 10px 14px; padding: 10px 16px; border-right: 0; border-bottom: 1px solid var(--hair); overflow: visible; }
+    .brand { padding: 0; }
+    .brand-sub { display: none; }
+    .nav { order: 3; flex-direction: row; overflow-x: auto; width: 100%; gap: 4px; margin: 0 -4px; padding: 0 4px 2px; scrollbar-width: none; }
+    .nav::-webkit-scrollbar { display: none; }
+    .nav a { flex: none; padding: 6px 10px; }
+    .nav .count, .nav-alert, .nav-group { display: none; }
+    .side-foot { order: 2; margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: 8px; padding: 0; }
+    .side-foot .side-label, .side-foot .theme-block, .side-foot .sample-block, .sync-line { display: none; }
+    .sync { padding: 0; background: none; }
+    .sync-btn { margin: 0; padding: 5px 9px; }
+    .main { padding: 18px 16px 48px; }
+    .g-2, .window-grid { grid-template-columns: minmax(0, 1fr); }
+    .window-grid > .window + .window { border-left: 0; border-top: 1px solid var(--hair); }
+    .eff { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .eff > div:nth-child(n) { border-left: 0; border-top: 1px solid var(--hair); }
+    .eff > div:nth-child(-n+2) { border-top: 0; }
+    .eff > div:nth-child(even) { border-left: 1px solid var(--hair); }
+    .cost-figure .big { font-size: 30px; }
+    .share-row { grid-template-columns: minmax(0, 1fr) 80px; }
+    .share-row .share-bar-cell { grid-column: 1 / -1; order: 3; }
+    .hide-sm { display: none; }
+  }
+  .no-motion *, .no-motion *::before, .no-motion *::after { transition: none !important; animation: none !important; }
+  .settled .meter-fill, .settled .meter-proj, .settled .share-bar span { transition: none; }
+  .settled .capacity span { transition: opacity 0.2s ease; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0s !important; animation-duration: 0s !important; }
+  }
+
+  /* ---------- Native macOS shell ----------
+     The app adds html.native: the window's vibrancy shows through the
+     sidebar, and colours come from the system (label, separator and accent
+     colours), so the page follows Light/Dark, the accent colour and
+     Increase Contrast exactly like an AppKit view. --native-window-bg is
+     injected by the app (WebKit has no CSS keyword for it). */
+  html.native { --side-w: 220px; }
+  html.native body { background: transparent; }
+  html.native .sidebar { background: transparent; border-right: 1px solid var(--hair); padding-top: 50px; }
+  html.native .brand { display: none; }
+  html.native .main { background: var(--ground); min-height: 100vh; padding-top: 42px; }
+  html.native .nav a .icon { color: var(--plan); }
+  html.native .nav a[aria-current="page"] { background: var(--nav-selected); }
+  html.native .sync { background: var(--panel-2); }
+  @supports (color: -apple-system-label) {
+    html.native {
+      color-scheme: light dark;
+      --ground: var(--native-window-bg, #ececec);
+      --panel: -apple-system-control-background;
+      --panel-2: color-mix(in srgb, -apple-system-label 4%, var(--panel));
+      --hair: -apple-system-separator;
+      --hair-strong: -apple-system-container-border;
+      --ink: -apple-system-label;
+      --ink-2: -apple-system-secondary-label;
+      --ink-3: -apple-system-secondary-label;
+      --track: -apple-system-quaternary-label;
+      --plan: -apple-system-control-accent;
+      --plan-ink: -apple-system-control-accent;
+      --plan-soft: color-mix(in srgb, -apple-system-control-accent 35%, var(--panel));
+      --plan-wash: color-mix(in srgb, -apple-system-control-accent 14%, transparent);
+      --nav-selected: color-mix(in srgb, -apple-system-label 9%, transparent);
+      --warn: -apple-system-orange;
+      --warn-ink: color-mix(in srgb, -apple-system-orange 72%, -apple-system-label);
+      --warn-wash: color-mix(in srgb, -apple-system-orange 15%, transparent);
+      --crit: -apple-system-red;
+      --crit-ink: color-mix(in srgb, -apple-system-red 80%, -apple-system-label);
+      --crit-wash: color-mix(in srgb, -apple-system-red 12%, transparent);
+      --good-ink: -apple-system-green;
+      --heat-0: -apple-system-quaternary-label;
+      --heat-1: color-mix(in srgb, -apple-system-control-accent 28%, var(--panel));
+      --heat-2: color-mix(in srgb, -apple-system-control-accent 52%, var(--panel));
+      --heat-3: color-mix(in srgb, -apple-system-control-accent 78%, var(--panel));
+      --heat-4: -apple-system-control-accent;
+      --grid: -apple-system-separator;
+      --axis: -apple-system-container-border;
+      --tip: -apple-system-control-background;
+    }
+    @media (prefers-color-scheme: dark) {
+      html.native {
+        --ground: var(--native-window-bg, #1e1e1e);
+        --panel: color-mix(in srgb, -apple-system-label 6%, var(--ground));
+      }
+    }
+  }
+  .loading-dots::after { content: "…"; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-overview" viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="6" rx="1.6"/><rect x="11" y="3" width="6" height="6" rx="1.6"/><rect x="3" y="11" width="6" height="6" rx="1.6"/><rect x="11" y="11" width="6" height="6" rx="1.6"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 20 20"><path d="M3.2 14.5a7 7 0 1 1 13.6 0"/><path d="M10 12.5 13.2 7.6"/><circle cx="10" cy="12.8" r="1.1"/></symbol>
+    <symbol id="i-cost" viewBox="0 0 20 20"><path d="M5 2.8h10v14.4l-1.9-1.2-1.6 1.2-1.5-1.2-1.5 1.2-1.6-1.2L5 17.2z"/><path d="M7.6 6.6h4.8M7.6 9.6h4.8M7.6 12.6h2.6"/></symbol>
+    <symbol id="i-activity" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="13" rx="2.2"/><path d="M3 8h14M7 2.6V5.4M13 2.6V5.4"/><path d="M6.5 11h1M9.5 11h1M12.5 11h1M6.5 14h1M9.5 14h1"/></symbol>
+    <symbol id="i-sessions" viewBox="0 0 20 20"><path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/><circle cx="4" cy="5.5" r="0.9"/><circle cx="4" cy="10" r="0.9"/><circle cx="4" cy="14.5" r="0.9"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.8 6.2a1.8 1.8 0 0 1 1.8-1.8h3.2l1.8 1.9h5.8a1.8 1.8 0 0 1 1.8 1.8v6.7a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8z"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8"/><rect x="8.3" y="8.3" width="3.4" height="3.4" rx="0.6"/><path d="M8 2.8v2.7M12 2.8v2.7M8 14.5v2.7M12 14.5v2.7M2.8 8h2.7M2.8 12h2.7M14.5 8h2.7M14.5 12h2.7"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 20 20"><path d="M16 8.2A6.3 6.3 0 0 0 4.6 6.4M4 11.8a6.3 6.3 0 0 0 11.4 1.8"/><path d="M4.4 3.6v3h3M15.6 16.4v-3h-3"/></symbol>
+    <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.8" cy="8.8" r="5.3"/><path d="m12.8 12.8 3.9 3.9"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.4 17.3 16H2.7z"/><path d="M10 8.2v3.6"/><circle cx="10" cy="13.9" r="0.4"/></symbol>
+    <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 9v4.6"/><circle cx="10" cy="6.4" r="0.4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="m6.9 10.2 2.1 2.1 4.1-4.4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></symbol>
+    <symbol id="i-close" viewBox="0 0 20 20"><path d="m5.5 5.5 9 9M14.5 5.5l-9 9"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 20 20"><circle cx="10" cy="10" r="3.2"/><path d="M10 2.6v1.6M10 15.8v1.6M2.6 10h1.6M15.8 10h1.6M4.8 4.8l1.1 1.1M14.1 14.1l1.1 1.1M4.8 15.2l1.1-1.1M14.1 5.9l1.1-1.1"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 20 20"><path d="M15.8 12.3A6.6 6.6 0 0 1 7.7 4.2a6.6 6.6 0 1 0 8.1 8.1z"/></symbol>
+    <symbol id="i-auto" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.8"/><path d="M10 3.2v13.6a6.8 6.8 0 0 0 0-13.6z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="g-claude" viewBox="0 0 20 20"><path d="M10 2.6v14.8M2.6 10h14.8M4.8 4.8l10.4 10.4M15.2 4.8 4.8 15.2"/></symbol>
+    <symbol id="g-codex" viewBox="0 0 20 20"><rect x="2.8" y="3.8" width="14.4" height="12.4" rx="2.6"/><path d="m6.2 8 2.4 2-2.4 2M10.6 12.2h3.2"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark"><svg class="icon"><use href="#i-gauge"/></svg></div>
+      <div>
+        <div class="brand-name">Token Meter</div>
+        <div class="brand-sub">Claude Code · Codex</div>
+      </div>
+    </div>
+
+    <nav class="nav" aria-label="Sections">
+      <div class="nav-group">Summary</div>
+      <a href="#overview" data-view="overview"><svg class="icon"><use href="#i-overview"/></svg>Overview</a>
+      <a href="#limits" data-view="limits"><svg class="icon"><use href="#i-gauge"/></svg>Limits<span class="nav-alert" id="nav-limit-alert" hidden></span></a>
+      <a href="#cost" data-view="cost"><svg class="icon"><use href="#i-cost"/></svg>Cost</a>
+      <div class="nav-group">Breakdown</div>
+      <a href="#sessions" data-view="sessions"><svg class="icon"><use href="#i-sessions"/></svg>Sessions<span class="count" id="nav-session-count"></span></a>
+      <a href="#projects" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg>Projects</a>
+      <a href="#models" data-view="models"><svg class="icon"><use href="#i-chip"/></svg>Models</a>
+    </nav>
+
+    <div class="side-foot">
+      <div>
+        <div class="side-label">Source</div>
+        <div class="seg" id="source-seg" role="group" aria-label="Source">
+          <button data-source="all">Both</button>
+          <button data-source="claude">Claude</button>
+          <button data-source="codex">Codex</button>
+        </div>
+      </div>
+      <div class="sync" id="sync"></div>
+    </div>
+  </aside>
+
+  <main class="main" id="main">
+    <section class="view" id="view-overview" data-view="overview"></section>
+    <section class="view" id="view-limits" data-view="limits" hidden></section>
+    <section class="view" id="view-cost" data-view="cost" hidden></section>
+    <section class="view" id="view-sessions" data-view="sessions" hidden></section>
+    <section class="view" id="view-transcript" data-view="transcript" hidden></section>
+    <section class="view" id="view-projects" data-view="projects" hidden></section>
+    <section class="view" id="view-models" data-view="models" hidden></section>
+  </main>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+
+<script>
+"use strict";
+
+/* ===================== Utilities ===================== */
+const $ = (sel, root = document) => root.querySelector(sel);
+const DAY = 86400000, HOUR = 3600000, MIN = 60000;
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const WEEKDAYS = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6"];
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function esc(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function usd(n, { cents } = {}) {
+  n = Number(n) || 0;
+  if (!cents && Math.abs(n) >= 1000) return "$" + Math.round(n).toLocaleString("en-US");
+  return "$" + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function tokens(n) {
+  n = Number(n) || 0;
+  if (n >= 1e9) return (n / 1e9).toFixed(n >= 1e10 ? 1 : 2) + "B";
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 1 : 2) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + "K";
+  return String(Math.round(n));
+}
+function int(n) { return Math.round(Number(n) || 0).toLocaleString("en-US"); }
+function pct(n, d = 0) { return (Number(n) || 0).toFixed(d) + "%"; }
+function clockTime(t) { return new Date(t).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }); }
+function dayName(t) { return new Date(t).toLocaleDateString("en-US", { weekday: "short" }); }
+function shortDate(t) { const d = new Date(t); return MONTHS[d.getMonth()] + " " + d.getDate(); }
+function fullDate(t) { const d = new Date(t); return MONTHS[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear(); }
+function dayKey(t) { const d = new Date(t); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+function startOfDay(t) { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); }
+function isToday(t) { return dayKey(t) === dayKey(Date.now()); }
+function resetLabel(t) {
+  // Reset times jitter by about a second around the minute; round to it.
+  t = t + 30000;
+  if (isToday(t)) return clockTime(t);
+  return dayName(t) + " " + clockTime(t);
+}
+function duration(ms) {
+  const m = Math.max(0, Math.round(ms / MIN));
+  if (m < 60) return m + "m";
+  const h = Math.floor(m / 60);
+  if (h < 48) return h + "h " + String(m % 60).padStart(2, "0") + "m";
+  return (ms / DAY).toFixed(1) + " days";
+}
+function ago(t) {
+  const s = (Date.now() - t) / 1000;
+  if (s < 90) return "just now";
+  if (s < 3600) return Math.round(s / 60) + "m ago";
+  if (s < 86400) return Math.round(s / 3600) + "h ago";
+  if (s < 86400 * 7) return Math.round(s / 86400) + "d ago";
+  return shortDate(t);
+}
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function niceMax(v) {
+  if (v <= 0) return 10;
+  const m = Math.pow(10, Math.floor(Math.log10(v)));
+  const r = v / m;
+  // Axes tick at 0, half and max, so every step must halve cleanly.
+  return (r <= 1 ? 1 : r <= 2 ? 2 : r <= 4 ? 4 : r <= 5 ? 5 : r <= 6 ? 6 : r <= 8 ? 8 : 10) * m;
+}
+function load(key, fallback) { try { return localStorage.getItem(key) ?? fallback; } catch (e) { return fallback; } }
+function save(key, value) { try { localStorage.setItem(key, value); } catch (e) {} }
+function glyph(source, cls = "glyph") {
+  return `<svg class="icon ${cls}" aria-hidden="true"><use href="#g-${source === "codex" ? "codex" : "claude"}"/></svg>`;
+}
+function icon(id, extra = "") { return `<svg class="icon" ${extra} aria-hidden="true"><use href="#i-${id}"/></svg>`; }
+const SOURCE_LABEL = { claude: "Claude", codex: "Codex" };
+
+/* ===================== Data =====================
+   Everything comes from the app's own backend over the app:// scheme. */
+const PERIODS = [["1d", 1, "24 hours"], ["3d", 3, "3 days"], ["7d", 7, "7 days"], ["2w", 14, "2 weeks"], ["1m", 30, "30 days"], ["3m", 90, "90 days"], ["6m", 180, "180 days"], ["1y", 365, "365 days"]];
+const TOKEN_TYPES = [["input", "Input"], ["output", "Output"], ["cache_read", "Cache read"], ["cache_write", "Cache write"]];
+
+const state = {
+  view: "overview",
+  source: load("usage-source", "all"),
+  period: load("usage-period", "7d"),
+  query: "", sort: { key: "end_ts", dir: -1 }, selected: null, limit: 40,
+  data: null, sessions: null, error: null, loading: false,
+  transcriptId: null, transcript: null, turnSort: "order", expanded: new Set(), showCarried: false,
+};
+if (!["all", "claude", "codex"].includes(state.source)) state.source = "all";
+if (!PERIODS.some(p => p[0] === state.period)) state.period = "7d";
+const devParams = new URLSearchParams(location.search);
+if (devParams.get("motion") === "off") document.documentElement.classList.add("no-motion");
+if (["light", "dark"].includes(devParams.get("theme"))) document.documentElement.dataset.theme = devParams.get("theme");
+
+async function api(path, options) {
+  const res = await fetch(path, { cache: "no-store", ...options });
+  const body = await res.json();
+  if (!res.ok || body.error) throw new Error(body.error || "HTTP " + res.status);
+  return body;
+}
+
+function ms(v) { return v == null ? null : typeof v === "number" ? v : Date.parse(v); }
+function withSessions(r) { return { ...r, sessions: r.session_count ?? 0 }; }
+function normSession(s) {
+  const models = (s.models || "").split(",").filter(m => m && m !== "<synthetic>").join(",");
+  return { ...s, start_ts: ms(s.start_ts), end_ts: ms(s.end_ts), models };
+}
+
+function adaptWindow(w) {
+  if (!w) return null;
+  const c = w.credit;
+  return {
+    start: ms(w.start), end: ms(w.end), pct: w.pct ?? null, cost: w.cost || 0, buckets: w.buckets || null,
+    prev_cost: w.prev_cost || 0, estimated: !!w.estimated,
+    credit: c ? { available: !!c.available, total: c.estimated_total_dollars, points: c.points, needed: c.points_needed } : null,
+  };
+}
+
+function adaptForecast(f) {
+  if (!f) return null;
+  if (!f.available) return { unavailable: f.reason || "" };
+  const raw = f.projected_final_raw ?? f.projected_final_percentage;
+  return {
+    projected: Math.min(100, raw), projected_raw: raw,
+    low: f.projected_low_raw ?? f.projected_final_low ?? raw, high: f.projected_high_raw ?? f.projected_final_high ?? raw,
+    exhaustion_at: ms(f.exhaustion_at), earliest: ms(f.exhaustion_at_earliest), latest: ms(f.exhaustion_at_latest),
+    method: f.method, reference_weeks: f.reference_weeks, typical_error: f.typical_error_pp, burn_per_day: f.burn_rate_pct_per_day,
+  };
+}
+
+function adaptLimits(l) {
+  const now = Date.now();
+  const five = adaptWindow(l.five_hour), weekly = adaptWindow(l.weekly);
+  const history = (l.history || []).map(h => ({ start: ms(h.start), end: ms(h.end), v: h.peak ?? 0 }))
+    .filter(h => h.end <= now).sort((a, b) => a.start - b.start).slice(-8)
+    .map(h => ({ v: h.v, label: shortDate(h.start) }));
+  return {
+    status: l.status, error: l.error, synced_at: ms(l.synced_at), five_hour: five, weekly,
+    forecast: weekly ? adaptForecast(l.forecast) : null, history,
+    credit: { five_hour: five?.credit, weekly: weekly?.credit },
+  };
+}
+
+function adaptDashboard(d) {
+  return {
+    generated_at: ms(d.generated_at),
+    period: withSessions(d.period),
+    by_source: d.by_source.map(withSessions),
+    by_model: d.by_model.filter(m => m.model !== "<synthetic>").map(withSessions),
+    by_project: d.by_project.map(withSessions),
+    daily: d.daily,
+    longest: d.longest_session ? normSession(d.longest_session) : null,
+    recent: d.recent_sessions.map(normSession),
+    session_total: d.session_total,
+    activity: d.activity,
+    limits: { claude: adaptLimits(d.limits.claude), codex: adaptLimits(d.limits.codex) },
+  };
+}
+
+async function refresh() {
+  state.loading = true;
+  try {
+    const days = periodDays();
+    state.data = adaptDashboard(await api(`/api/app/dashboard?source=${state.source}&days=${days}`));
+    if (state.view === "transcript" && state.transcriptId) await loadTranscript(state.transcriptId, true);
+    if (state.view === "sessions" || state.sessions) {
+      state.sessions = (await api(`/api/all-sessions?source=${state.source}`)).sessions.map(normSession);
+    }
+    state.error = null;
+    retries = 0;
+  } catch (e) {
+    state.error = String(e.message || e);
+    // Until the first data arrives, retry quickly instead of waiting for the
+    // 60-second refresh.
+    if (!state.data && retries < 5) setTimeout(refresh, 1000 * 2 ** retries++);
+  }
+  state.loading = false;
+  render();
+}
+let retries = 0;
+
+async function loadTranscript(id, quiet = false) {
+  if (!quiet) state.transcript = { id, loading: true };
+  try {
+    const data = await api(`/api/app/transcript?id=${encodeURIComponent(id)}`);
+    if (state.transcriptId === id) state.transcript = { id, data };
+  } catch (e) {
+    if (!quiet && state.transcriptId === id) state.transcript = { id, error: String(e.message || e) };
+  }
+  if (!quiet) render();
+}
+
+function sourcesShown() { return state.source === "all" ? ["claude", "codex"] : [state.source]; }
+function periodDays() { return PERIODS.find(p => p[0] === state.period)[1]; }
+function periodLabel() { return "Last " + PERIODS.find(p => p[0] === state.period)[2]; }
+
+/* Calendar days ending today, built from local dates so DST never skips
+   or repeats a day. */
+function lastDays(n, now = Date.now()) {
+  const today = new Date(now);
+  return Array.from({ length: n }, (_, i) => new Date(today.getFullYear(), today.getMonth(), today.getDate() - (n - 1 - i)).getTime());
+}
+
+/* Session naming: the title Claude Code / Codex recorded, else the first
+   prompt, else a clearly-untitled fallback that still identifies it. */
+function sessionName(s) {
+  if (s.title) return { text: s.title, html: esc(s.title), kind: "title" };
+  if (s.first_prompt) {
+    const p = s.first_prompt.length > 80 ? s.first_prompt.slice(0, 78).trimEnd() + "…" : s.first_prompt;
+    return { text: p, html: `<span class="q">“</span>${esc(p)}<span class="q">”</span>`, kind: "prompt" };
+  }
+  const text = `Untitled · ${s.project} · ${shortDate(s.start_ts)}, ${clockTime(s.start_ts)}`;
+  return { text, html: esc(text), kind: "untitled" };
+}
+
+/* ===================== Tooltip ===================== */
+const tip = $("#tip");
+const tips = new Map();
+let tipSeq = 0;
+function tipAttr(html) { const id = "t" + (++tipSeq); tips.set(id, html); return `data-tip="${id}"`; }
+function placeTip(e) {
+  const pad = 14, rect = tip.getBoundingClientRect();
+  let x = e.clientX + pad, y = e.clientY + pad;
+  if (x + rect.width > innerWidth - 8) x = e.clientX - rect.width - pad;
+  if (y + rect.height > innerHeight - 8) y = e.clientY - rect.height - pad;
+  tip.style.left = Math.max(8, x) + "px";
+  tip.style.top = Math.max(8, y) + "px";
+}
+document.addEventListener("pointerover", e => {
+  const el = e.target.closest("[data-tip]");
+  if (!el || !tips.has(el.dataset.tip)) return;
+  tip.innerHTML = tips.get(el.dataset.tip);
+  tip.classList.add("on");
+  placeTip(e);
+});
+document.addEventListener("pointermove", e => { if (tip.classList.contains("on")) placeTip(e); });
+document.addEventListener("pointerout", e => {
+  const el = e.target.closest("[data-tip]");
+  if (el && !el.contains(e.relatedTarget)) tip.classList.remove("on");
+});
+function tipRows(title, rows) {
+  return `<div class="t">${esc(title)}</div>` + rows.map(([k, v, color]) =>
+    `<div class="r"><span>${color ? `<i style="background:var(${color})"></i>` : ""}${esc(k)}</span><b>${esc(v)}</b></div>`).join("");
+}
+
+/* ===================== Motion ===================== */
+// Meters, capacity bars and share bars fill in once, on the first load.
+// Every later render (period, source, sync) shows the new values at once.
+let filledOnce = false;
+function settle(root) {
+  const apply = () => {
+    root.querySelectorAll("[data-w]").forEach(el => { el.style.width = el.dataset.w; });
+    root.querySelectorAll("[data-fg]").forEach(el => { el.style.flexGrow = el.dataset.fg; });
+  };
+  if (filledOnce) { apply(); return; }
+  filledOnce = true;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    apply();
+    setTimeout(() => document.documentElement.classList.add("settled"), 1000);
+  }));
+}
+
+/* ===================== Components ===================== */
+function level(p) { return p >= 90 ? "crit" : p >= 75 ? "warn" : "ok"; }
+
+function meterHTML(name, w, kind, src) {
+  const now = Date.now();
+  if (w.pct == null) {
+    // No percentage reported (the provider's API is unreachable): show the
+    // locally estimated window and its cost, without pretending to a fill.
+    return `
+    <div class="meter" data-level="ok">
+      <div class="meter-head"><span class="meter-name">${esc(name)}</span><span class="meter-value"><b>${usd(w.cost)}</b> so far</span></div>
+      <div class="meter-foot"><span>Resets around <b>${esc(resetLabel(w.end))}</b> · window estimated from your logs</span><span>No usage % reported yet</span></div>
+    </div>`;
+  }
+  const lvl = level(w.pct);
+  const fc = kind === "weekly" && src.forecast && !src.forecast.unavailable ? src.forecast : null;
+  const fcNote = kind === "weekly" && src.forecast?.unavailable ? forecastReason(src.forecast.unavailable) : "";
+  const ticks = kind === "weekly" ? 7 : 5;
+  const elapsed = Math.min(1, Math.max(0, (now - w.start) / (w.end - w.start)));
+  const proj = fc ? Math.min(100, fc.projected_raw) : 0;
+  const badge = lvl === "crit" ? `<span class="lvl crit">${icon("alert")}Almost out</span>`
+              : lvl === "warn" ? `<span class="lvl warn">${icon("alert")}High</span>` : "";
+  const timeTip = tipAttr(tipRows(name, [
+    ["Used", pct(w.pct)], ["Time elapsed", pct(elapsed * 100)],
+    ...(fc ? [["Projected at reset", pct(fc.projected_raw)]] : []),
+    ["Resets", resetLabel(w.end)],
+  ]));
+  let forecast = "";
+  if (fc) {
+    const flat = fc.method === "flat" ? " Rough estimate: fewer than three past weeks to compare against." : "";
+    if (fc.exhaustion_at && fc.exhaustion_at < w.end) {
+      const before = duration(w.end - fc.exhaustion_at);
+      forecast = `<div class="forecast crit">${icon("alert")}<div>On pace to run out <b>${esc(resetLabel(fc.exhaustion_at))}</b>, ${esc(before)} before it resets.${flat}</div></div>`;
+    } else if (fc.projected >= 75) {
+      forecast = `<div class="forecast warn">${icon("alert")}<div>On pace to finish the week near <b>${pct(fc.projected)}</b>.${flat}</div></div>`;
+    } else {
+      forecast = `<div class="forecast">${icon("info")}<div>On pace to finish the week around <b>${pct(fc.projected)}</b> (${pct(Math.min(100, fc.low))}–${pct(Math.min(100, fc.high))}).${flat}</div></div>`;
+    }
+  } else if (fcNote) {
+    forecast = `<div class="forecast">${icon("info")}<div>${esc(fcNote)}</div></div>`;
+  }
+  const tickMarks = Array.from({ length: ticks - 1 }, (_, i) => `<i style="left:${((i + 1) / ticks) * 100}%"></i>`).join("");
+  return `
+    <div class="meter" data-level="${lvl}" ${fc && fc.projected_raw > 100 ? 'data-proj="over"' : ""}>
+      <div class="meter-head">
+        <span class="meter-name">${esc(name)}</span>
+        <span class="meter-value">${badge}<b>${Math.round(w.pct)}%</b> used</span>
+      </div>
+      <div class="meter-wrap" ${timeTip}>
+        <div class="meter-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(w.pct)}" aria-label="${esc(name)} used">
+          ${fc ? `<div class="meter-proj" data-w="${proj}%"></div>` : ""}
+          <div class="meter-fill" data-w="${Math.min(100, w.pct)}%"></div>
+          <div class="meter-ticks">${tickMarks}</div>
+        </div>
+        <div class="meter-now" style="left:${elapsed * 100}%" title="Time elapsed in this window"></div>
+      </div>
+      <div class="meter-foot">
+        <span>Resets in <b>${esc(duration(w.end - now))}</b> · ${esc(resetLabel(w.end))}</span>
+        <span>${usd(w.cost)} at API rates</span>
+      </div>
+      ${forecast}
+    </div>`;
+}
+
+function forecastReason(reason) {
+  if (/^only /.test(reason)) return "A forecast appears 12 hours into the week.";
+  if (/no weekly window/.test(reason)) return "No weekly window in progress.";
+  return reason.charAt(0).toUpperCase() + reason.slice(1) + ".";
+}
+
+function syncAside(src) {
+  if (src.status === "ok") return `Synced ${ago(src.synced_at)}`;
+  if (src.status === "error") return "Sync failed";
+  return "";
+}
+
+function allowancePanel(source) {
+  const src = state.data.limits[source];
+  const head = `<div class="source-head">${glyph(source)}<span class="name">${SOURCE_LABEL[source]}</span>${src.plan ? `<span class="plan">${esc(src.plan)}</span>` : ""}<span class="aside">${esc(syncAside(src))}</span></div>`;
+  if (src.status === "waiting") {
+    return `<div class="panel">${head}<div class="empty-state"><h3>Waiting for the first sync</h3>
+      Limits come straight from Anthropic, using the login Claude Code already keeps in your Keychain.
+      <ol><li>Install Claude Code and sign in once (<code>claude</code>).</li><li>Choose <b>Sync now</b>, or wait up to 10 minutes.</li></ol></div></div>`;
+  }
+  if (src.status === "error" && !src.five_hour && !src.weekly) {
+    return `<div class="panel">${head}<div class="empty-state"><h3>Couldn't reach ${SOURCE_LABEL[source]}</h3>${esc(src.error || "")}
+      <p style="margin:8px 0 0">The dashboard keeps trying every 10 minutes. You can also choose <b>Sync now</b>.</p></div></div>`;
+  }
+  if (src.status === "missing") {
+    return `<div class="panel">${head}<div class="empty-state"><h3>Codex CLI not found</h3>
+      Install the Codex CLI and sign in with a ChatGPT plan to see its weekly limit here. Cost tracking starts with your first Codex session.</div></div>`;
+  }
+  const rows = [];
+  if (src.status === "error") rows.push(`<div class="empty-state" style="padding:12px 18px 0;color:var(--crit-ink)">Last sync failed: ${esc(src.error || "")}</div>`);
+  if (src.five_hour) rows.push(meterHTML("5-hour window", src.five_hour, "five_hour", src));
+  if (src.weekly) rows.push(meterHTML("Weekly limit", src.weekly, "weekly", src));
+  return `<div class="panel">${head}<div class="rows">${rows.join("")}</div></div>`;
+}
+
+function capacityHTML(parts, total, key) {
+  // parts: [{label, value, color, sub}] — the legend doubles as direct labels.
+  const segs = parts.map((p, i) => `<span class="cap-seg" data-i="${i}" data-fg="${total ? p.value / total : 0}" style="background:var(${p.color})" ${tipAttr(tipRows(p.label, [["Cost", usd(p.value)], ["Share", pct(total ? p.value / total * 100 : 0, 1)], ...(p.sub ? [[p.sub[0], p.sub[1]]] : [])]))}></span>`).join("");
+  const legend = parts.map((p, i) => `<li data-i="${i}"><span class="sw" style="background:var(${p.color})"></span><span class="nm">${esc(p.label)}</span><span class="vl">${usd(p.value)}</span><span class="sh">${pct(total ? p.value / total * 100 : 0)}</span></li>`).join("");
+  return `<div class="capacity" data-cap="${key}">${segs}</div><ul class="legend" data-cap="${key}">${legend}</ul>`;
+}
+// Hovering a segment or its legend row isolates the pair.
+document.addEventListener("pointerover", e => {
+  const item = e.target.closest(".capacity [data-i], .legend[data-cap] li");
+  document.querySelectorAll(".lit").forEach(el => el.classList.remove("lit"));
+  if (!item) return;
+  const key = item.parentElement.dataset.cap, i = item.dataset.i;
+  document.querySelectorAll(`[data-cap="${key}"] [data-i="${i}"]`).forEach(el => el.classList.add("lit"));
+  if (item.tagName === "LI") $(`.capacity[data-cap="${key}"]`)?.classList.add("focus");
+});
+document.addEventListener("pointerout", e => {
+  if (!e.relatedTarget || !e.relatedTarget.closest?.(".legend[data-cap]")) document.querySelectorAll(".capacity.focus").forEach(el => el.classList.remove("focus"));
+});
+
+function foldParts(list, labelOf, max = 5) {
+  const parts = list.slice(0, max).map((m, i) => ({ label: labelOf(m), value: m.cost, color: SERIES[i] }));
+  const rest = list.slice(max).reduce((a, m) => a + m.cost, 0);
+  if (rest > 0) parts.push({ label: `Other (${list.length - max})`, value: rest, color: "--ink-3" });
+  return parts;
+}
+
+function deltaHTML(cur, prev, days) {
+  if (!prev) return `<span class="delta"><span class="vs">no earlier ${days === 1 ? "day" : "period"} to compare</span></span>`;
+  const d = (cur - prev) / prev * 100;
+  const up = d >= 0;
+  return `<span class="delta ${up ? "up" : "down"}">${up ? "+" : "−"}${pct(Math.abs(d))} <span class="vs">vs previous ${PERIODS.find(p => p[1] === days)[2]}</span></span>`;
+}
+
+/* Bar charts are drawn after layout so they can measure their width. */
+const charts = [];
+function chartSlot(cfg) { charts.push(cfg); return `<div class="chart${cfg.fill ? " fill" : ""}" id="chart-${charts.length - 1}"></div>`; }
+function drawCharts() {
+  charts.forEach((cfg, i) => { const el = document.getElementById("chart-" + i); if (el) drawBars(el, cfg); });
+}
+let lastWidth = 0;
+new ResizeObserver(() => {
+  const w = $("#main").clientWidth;
+  if (lastWidth && Math.abs(w - lastWidth) > 4 && state.data) { lastWidth = w; render(); }
+  else lastWidth = w;
+}).observe($("#main"));
+
+function axisUsd(v) {
+  if (v === 0) return "$0";
+  if (v >= 1000) return "$" + (v / 1000).toFixed(v % 1000 ? 1 : 0) + "K";
+  return v >= 10 ? "$" + Math.round(v) : "$" + v.toFixed(v % 1 ? 2 : 0);
+}
+
+function topRounded(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h);
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+
+function drawBars(el, { items, keys, height = 190, fill, labelOf, tipOf, attrOf }) {
+  const W = Math.max(280, el.clientWidth), H = fill ? Math.max(170, el.clientHeight) : height, padL = 46, padB = 24, padT = 8;
+  const plotW = W - padL, plotH = H - padB - padT;
+  const totals = items.map(it => keys.reduce((a, k) => a + (it[k[0]] || 0), 0));
+  const max = niceMax(Math.max(...totals, 0.01));
+  const slot = plotW / items.length, bw = Math.max(3, Math.min(26, slot * 0.64));
+  const every = Math.max(1, Math.ceil(items.length / Math.max(3, Math.floor(plotW / 70))));
+  let svg = "";
+  for (let g = 0; g <= 2; g++) {
+    const y = padT + plotH - (plotH * g) / 2;
+    svg += `<line class="${g ? "gridline" : "baseline"}" x1="${padL}" x2="${W}" y1="${y}" y2="${y}"/>`;
+    svg += `<text class="tick" x="${padL - 8}" y="${y + 4}" text-anchor="end">${esc(axisUsd((max * g) / 2))}</text>`;
+  }
+  items.forEach((it, i) => {
+    const cx = padL + slot * i + slot / 2, x = cx - bw / 2;
+    let y = padT + plotH, segs = "";
+    const nonzero = keys.filter(k => it[k[0]] > 0);
+    nonzero.forEach((k, j) => {
+      const h = (it[k[0]] / max) * plotH;
+      const gap = j < nonzero.length - 1 && h > 3 ? 2 : 0;
+      const top = y - h;
+      segs += j === nonzero.length - 1
+        ? `<path class="bar" d="${topRounded(x, top, bw, h - gap * 0, 4)}" style="fill:var(${k[2]})"/>`
+        : `<rect class="bar" x="${x}" y="${top + gap}" width="${bw}" height="${Math.max(0, h - gap)}" style="fill:var(${k[2]})"/>`;
+      y = top;
+    });
+    const label = i % every === 0 ? `<text class="tick" x="${cx}" y="${H - 6}" text-anchor="middle">${esc(labelOf(it))}</text>` : "";
+    svg += `<g class="col" ${attrOf ? attrOf(it) : ""} ${tipAttr(tipOf(it))}><rect class="hit" x="${padL + slot * i}" y="${padT}" width="${slot}" height="${plotH}" rx="4"/>${segs}${label}</g>`;
+  });
+  el.innerHTML = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Bar chart">${svg}</svg>`;
+}
+
+function seriesForPeriod(days, now) {
+  // Daily bars up to 90 days; weekly beyond, so bars stay readable.
+  const byDay = new Map((state.data.daily || []).map(d => [d.day, d]));
+  const daily = lastDays(Math.max(days, 7), now).map(t => {
+    const d = byDay.get(dayKey(t)) || {};
+    return { t, cost: d.cost || 0, message_count: d.message_count || 0, sessions: d.session_count || 0,
+             cost_input: d.cost_input || 0, cost_output: d.cost_output || 0, cost_cache_read: d.cost_cache_read || 0, cost_cache_write: d.cost_cache_write || 0 };
+  });
+  if (days <= 90) return { items: daily, unit: "day" };
+  const weeks = [];
+  for (let i = daily.length; i > 0; i -= 7) {
+    const chunk = daily.slice(Math.max(0, i - 7), i);
+    const e = { t: chunk[0].t, end: chunk[chunk.length - 1].t, cost: 0, message_count: 0, cost_input: 0, cost_output: 0, cost_cache_read: 0, cost_cache_write: 0, sessions: 0 };
+    chunk.forEach(c => { for (const k of Object.keys(e)) if (k !== "t" && k !== "end") e[k] += c[k]; });
+    weeks.unshift(e);
+  }
+  return { items: weeks, unit: "week" };
+}
+
+function periodSeg() {
+  return `<div class="seg period" role="group" aria-label="Period">${PERIODS.map(([k, , label]) =>
+    `<button data-period="${k}" aria-pressed="${k === state.period}" title="Last ${label}">${k}</button>`).join("")}</div>`;
+}
+
+function viewHead(title, sub, right = "") {
+  return `<div class="view-head"><div><h1>${esc(title)}</h1>${sub ? `<div class="sub">${sub}</div>` : ""}</div>${right}</div>`;
+}
+
+function sessionRow(s) {
+  const n = sessionName(s);
+  return `<div class="list-row session-row" data-session="${esc(s.session_id)}">
+    ${glyph(s.source)}
+    <div style="min-width:0"><div class="s-name ${n.kind === "untitled" ? "untitled" : ""}">${n.html}</div>
+    <div class="s-meta">${esc(s.project)} · ${int(s.message_count)} messages · ${esc(s.models.split(",")[0])}</div></div>
+    <div><div class="s-cost">${usd(s.cost)}</div><div class="s-when">${esc(ago(s.end_ts))}</div></div>
+  </div>`;
+}
+
+/* ===================== Views ===================== */
+const views = {};
+
+views.overview = () => {
+  const now = Date.now(), days = periodDays();
+  const p = state.data.period;
+  const total = p.cost || 0;
+  const series = seriesForPeriod(days, now);
+  overviewRecent = state.data.recent;
+  const parts = foldParts(state.data.by_model, m => m.model);
+  const updated = `Updated ${ago(state.data.generated_at)}`;
+  const chartPanel = `
+      <div class="panel ov-chart">
+        <div class="panel-head"><div class="panel-title">Cost per ${series.unit}</div><div class="panel-aside">${esc(periodLabel())}</div></div>
+        <div class="panel-body">${total ? chartSlot({
+          items: series.items, keys: [["cost", "Cost", "--plan"]], fill: true,
+          labelOf: it => series.unit === "day" ? (days <= 14 ? dayName(it.t) + " " + new Date(it.t).getDate() : shortDate(it.t)) : shortDate(it.t),
+          tipOf: it => tipRows(series.unit === "day" ? fullDate(it.t) : "Week of " + shortDate(it.t), [["Cost", usd(it.cost)], ["Messages", int(it.message_count)], ["Sessions", int(it.sessions)]]),
+        }) : `<div class="empty-state">Nothing to chart yet.</div>`}</div>
+      </div>`;
+  const recentPanel = `
+      <div class="panel ov-recent">
+        <div class="panel-head"><div class="panel-title">Recent sessions</div><button class="link-btn" data-go="sessions">All sessions</button></div>
+        <div class="rows" id="recent-rows" style="margin-top:8px">${overviewRecent.length ? overviewRecent.slice(0, 3).map(sessionRow).join("") : `<div class="empty-state">Sessions appear here after your first Claude Code or Codex conversation.</div>`}</div>
+      </div>`;
+  return viewHead("Overview", updated) + `
+    <div class="grid g-overview">
+      <div class="stack fill">${sourcesShown().map(allowancePanel).join("")}${chartPanel}</div>
+      <div class="stack fill"><div class="panel ov-cost">
+        <div class="panel-head wrap"><div class="panel-title">${icon("cost")}API-equivalent cost</div>${state.data.session_total ? periodSeg() : ""}</div>
+        <div class="panel-body">
+          ${total ? `
+          <div class="cost-figure"><span class="big num">${usd(total)}</span>${deltaHTML(total, p.prev_cost, days)}</div>
+          <div class="cost-note">${esc(periodLabel())} · what this usage would cost at API rates.</div>
+          ${sourceSplitHTML(sourceStats(), total)}
+          ${capacityHTML(parts, total, "ov-models")}
+          <div class="cost-stats">
+            <div><div class="stat-k">Messages</div><div class="stat-v">${int(p.message_count)}</div></div>
+            <div><div class="stat-k">Sessions</div><div class="stat-v">${int(p.sessions)}</div></div>
+            <div><div class="stat-k">Tokens</div><div class="stat-v">${tokens(p.input_tokens + p.output_tokens + p.cache_read_tokens + p.cache_write_tokens)}</div></div>
+          </div>` : emptyCost()}
+        </div>
+      </div>${recentPanel}</div>
+    </div>
+    ${activityPanel()}`;
+};
+
+let overviewRecent = [];
+// Both overview columns end level: whichever is shorter gets filled with
+// real content — more recent sessions on the right (whole rows only), or a
+// taller cost chart on the left (it draws to whatever height it's given).
+function fillOverview() {
+  const grid = $(".g-overview");
+  const list = $("#recent-rows");
+  if (!grid || !list || !list.firstElementChild?.classList.contains("session-row")) return;
+  if (getComputedStyle(grid).gridTemplateColumns.split(" ").length < 2) {
+    list.insertAdjacentHTML("beforeend", overviewRecent.slice(3, 5).map(sessionRow).join(""));
+    return;
+  }
+  grid.style.alignItems = "start";
+  const [left, right] = [...grid.children].map(c => c.getBoundingClientRect().height);
+  grid.style.alignItems = "";
+  const rowH = list.firstElementChild.getBoundingClientRect().height;
+  // Round up: a partial row's worth of space goes to the chart, which
+  // grows to match, rather than staying empty under the list.
+  const add = Math.max(0, Math.ceil((left - right) / rowH));
+  list.insertAdjacentHTML("beforeend", overviewRecent.slice(3, 3 + add).map(sessionRow).join(""));
+}
+
+/* Per-source cost. Sources are told apart by glyph and name, never by hue,
+   so the split uses the neutral plan-blue share bar. */
+function sourceStats() {
+  return state.data.by_source;
+}
+
+function sourceSplitHTML(stats, total) {
+  if (state.source !== "all" || !total) return "";
+  return `<div class="src-split">${stats.map(st => `
+    <div class="src-row" ${tipAttr(tipRows(SOURCE_LABEL[st.source], [["Cost", usd(st.cost || 0)], ["Share", pct(total ? (st.cost || 0) / total * 100 : 0, 1)], ["Messages", int(st.message_count)], ["Sessions", int(st.sessions)]]))}>
+      ${glyph(st.source)}<span class="src-name">${SOURCE_LABEL[st.source]}</span>
+      <div class="share-bar"><span data-w="${total ? (st.cost || 0) / total * 100 : 0}%"></span></div>
+      <span class="src-val">${usd(st.cost || 0)}</span><span class="src-share">${pct(total ? (st.cost || 0) / total * 100 : 0)}</span>
+    </div>`).join("")}</div>`;
+}
+
+function sourceCostPanel(st, total, days) {
+  const cost = st.cost || 0;
+  const typeParts = TOKEN_TYPES.map(([k, label], i) => ({ label, value: st["cost_" + k] || 0, color: SERIES[i], sub: ["Tokens", tokens(st[k + "_tokens"])] }));
+  const body = cost ? `
+      <div class="cost-figure"><span class="big num" style="font-size:28px">${usd(cost)}</span>${deltaHTML(cost, st.prev_cost, days)}</div>
+      <div class="cost-note">${pct(total ? cost / total * 100 : 0)} of the total · ${esc(periodLabel().toLowerCase())}</div>
+      ${capacityHTML(typeParts, cost, "src-" + st.source)}
+      <div class="cost-stats">
+        <div><div class="stat-k">Messages</div><div class="stat-v">${int(st.message_count)}</div></div>
+        <div><div class="stat-k">Sessions</div><div class="stat-v">${int(st.sessions)}</div></div>
+        <div><div class="stat-k">Per message</div><div class="stat-v">${usd(cost / Math.max(1, st.message_count))}</div></div>
+      </div>` : `<div class="empty-state" style="padding:4px 0">No ${SOURCE_LABEL[st.source]} usage in this period.</div>`;
+  return `<div class="panel">
+    <div class="source-head">${glyph(st.source)}<span class="name">${SOURCE_LABEL[st.source]}</span><span class="aside">${esc(periodLabel())}</span></div>
+    <div class="panel-body" style="padding-top:8px">${body}</div>
+  </div>`;
+}
+
+function emptyCost() {
+  return `<div class="empty-state" style="padding:8px 0"><h3>No usage in this period</h3>Costs are worked out from the session logs Claude Code and Codex already write on this Mac. Nothing is uploaded.</div>`;
+}
+
+views.limits = () => {
+  const shown = sourcesShown();
+  const blocks = shown.map(source => {
+    const src = state.data.limits[source];
+    if (!src.five_hour && !src.weekly) return allowancePanel(source);
+    const kinds = [["five_hour", "5-hour window"], ["weekly", "Weekly limit"]].filter(([k]) => src[k]);
+    const windows = kinds.map(([k, name]) => {
+      const w = src[k];
+      const credit = src.credit?.[k];
+      const cols = k === "five_hour" ? 5 : 7;
+      const vals = w.buckets || Array.from({ length: cols }, () => null);
+      const maxB = Math.max(...vals.map(v => v || 0), 0.01);
+      const bars = vals.map((v, i) => {
+        const t = w.start + i * (k === "five_hour" ? HOUR : DAY);
+        const label = k === "five_hour" ? clockTime(t).replace(":00", "") : dayName(t);
+        return `<div class="mcol" ${tipAttr(tipRows(k === "five_hour" ? clockTime(t) + "–" + clockTime(t + HOUR) : fullDate(t), [["Cost", v == null ? "—" : usd(v)]]))}><div class="mbar ${v == null ? "future" : ""}" style="height:${v == null ? 2 : Math.max(2, (v / maxB) * 100)}%"></div></div>`;
+      }).join("");
+      const labels = vals.map((_, i) => { const t = w.start + i * (k === "five_hour" ? HOUR : DAY); return `<span>${esc(k === "five_hour" ? clockTime(t).replace(":00", "") : dayName(t))}</span>`; }).join("");
+      const prevDelta = w.prev_cost ? ` <span class="delta">${w.cost > w.prev_cost ? "+" : "−"}${pct(Math.abs((w.cost - w.prev_cost) / w.prev_cost * 100))}</span>` : "";
+      return `<div class="window">${meterHTML(name, w, k, src)}
+        ${w.buckets ? `<div class="mini">${bars}</div><div class="mini-x">${labels}</div>` : `<div class="note" style="padding:4px 18px 0">${SOURCE_LABEL[source]} reports this window as a rolling 7 days, so there's no per-day split.</div>`}
+        <div class="window-facts">
+          <div><div class="stat-k">Previous window</div><div class="stat-v">${w.prev_cost ? usd(w.prev_cost) : "No usage"}${prevDelta}</div></div>
+          <div><div class="stat-k">Full allowance, at API rates</div><div class="stat-v">${credit?.available ? "≈ " + usd(credit.total) : credit ? `<span class="muted" style="font-weight:500">After ${credit.needed - credit.points} more syncs</span>` : "—"}</div></div>
+        </div></div>`;
+    }).join("");
+    const onlyWeekly = !src.five_hour ? (src.plan ? " · " : "") + "Weekly window only on this plan" : "";
+    return `<div class="panel"><div class="source-head">${glyph(source)}<span class="name">${SOURCE_LABEL[source]}</span><span class="plan">${esc((src.plan || "") + onlyWeekly)}</span><span class="aside">${esc(syncAside(src))}</span></div>
+      <div class="window-grid ${kinds.length === 1 ? "single" : ""}">${windows}</div></div>`;
+  }).join("");
+
+  const forecasts = shown.map(source => {
+    const src = state.data.limits[source];
+    if (!src.forecast || !src.weekly || src.weekly.pct == null) return "";
+    const w = src.weekly;
+    if (src.forecast.unavailable) {
+      return `<div class="panel"><div class="panel-head"><div class="panel-title">${glyph(source)}${SOURCE_LABEL[source]} weekly forecast</div></div>
+        <div class="empty-state">${esc(forecastReason(src.forecast.unavailable))}</div></div>`;
+    }
+    const fc = src.forecast;
+    const highRaw = fc.projected_raw > 100 ? Math.max(fc.projected_raw, fc.high) : fc.high;
+    const scaleMax = highRaw > 100 ? Math.ceil(highRaw / 10) * 10 + 10 : 100;
+    const at = v => (Math.min(v, scaleMax) / scaleMax) * 100;
+    const runsOut = fc.exhaustion_at && fc.exhaustion_at < w.end;
+    const weeks = src.history.slice();
+    weeks.push({ v: w.pct, label: "This week", current: true });
+    return `<div class="grid g-2">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">${glyph(source)}${SOURCE_LABEL[source]} weekly forecast</div><div class="panel-aside">${fc.method === "shape" ? `Based on your last ${fc.reference_weeks} weeks` : "Straight-line estimate"}</div></div>
+        <div class="panel-body">
+          <div class="cost-figure"><span class="big num">${pct(fc.projected_raw > 100 ? fc.projected_raw : fc.projected)}</span><span class="delta"><span class="vs">projected at reset · now ${pct(w.pct)}</span></span></div>
+          <div class="range-bar" ${tipAttr(tipRows("Projected at reset", [["Likely", pct(fc.projected_raw)], ["Range", pct(fc.low) + "–" + pct(highRaw)], ["Now", pct(w.pct)]]))}>
+            <div class="rb-track"></div>
+            <div class="rb-band" style="left:${at(fc.low)}%;width:${at(highRaw) - at(fc.low)}%"></div>
+            <div class="rb-now" style="left:${at(w.pct)}%"></div>
+            <div class="rb-mid" style="left:${at(fc.projected_raw)}%"></div>
+            <div class="rb-limit" style="left:${at(100)}%"></div>
+          </div>
+          <div class="range-labels"><span style="left:${at(w.pct)}%">Now</span>${Math.abs(at(fc.projected_raw) - at(100)) > 8 ? `<span style="left:${at(100)}%">Limit</span>` : ""}<span style="left:${at(fc.projected_raw)}%">Likely</span></div>
+          <div class="kv" style="margin-top:12px">
+            <dt>Runs out</dt><dd>${runsOut ? `<b>${esc(resetLabel(fc.exhaustion_at))}</b>${fc.earliest && fc.latest ? ` <span class="muted">(${esc(resetLabel(fc.earliest))} – ${esc(resetLabel(fc.latest))})</span>` : ""}` : "Not at this pace"}</dd>
+            <dt>Resets</dt><dd>${esc(resetLabel(w.end))} <span class="muted">· in ${esc(duration(w.end - Date.now()))}</span></dd>
+            <dt>Burn rate</dt><dd>${pct(fc.burn_per_day, 1)} of the limit per day</dd>
+            ${fc.typical_error ? `<dt>Accuracy</dt><dd>Usually within ±${fc.typical_error.toFixed(0)} points by this point in the week</dd>` : ""}
+          </div>
+          ${fc.method === "shape" ? "" : `<p class="note" style="margin:12px 0 0">Scales today's usage by the time elapsed. It sharpens after three full weeks of history.</p>`}
+        </div>
+      </div>
+      <div class="panel weeks-panel">
+        <div class="panel-head"><div class="panel-title">${SOURCE_LABEL[source]} past weeks</div><div class="panel-aside">Peak usage per week</div></div>
+        <div class="panel-body" style="padding-top:18px">
+          <div class="weeks">${weeks.map(k => `<div class="wk ${k.current ? "current" : ""}" ${tipAttr(tipRows(k.current ? "This week so far" : "Week of " + k.label, [["Peak", pct(k.v)]]))}><span class="wk-val">${Math.round(k.v)}%</span><div class="wk-bar"><span style="height:${Math.min(100, k.v)}%"></span></div><span class="wk-label">${esc(k.label)}</span></div>`).join("")}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const synced = shown.map(s => state.data.limits[s]).filter(s => s.status === "ok" || s.status === "error");
+  return viewHead("Limits", synced.length ? "Reported by the providers themselves · synced every 10 minutes" : "Not synced yet") + blocks + forecasts;
+};
+
+views.cost = () => {
+  const now = Date.now(), days = periodDays();
+  const p = state.data.period;
+  const total = p.cost || 0;
+  const series = seriesForPeriod(days, now);
+  const typeParts = TOKEN_TYPES.map(([k, label], i) => ({ label, value: p["cost_" + k] || 0, color: SERIES[i], sub: ["Tokens", tokens(p[k + "_tokens"])] }));
+  const modelParts = foldParts(state.data.by_model, m => m.model, 6);
+  const firstDay = lastDays(days, now)[0];
+  const daily = series.unit === "day" ? series.items.filter(d => d.t >= firstDay && d.cost > 0) : [];
+  const top = daily.reduce((a, d) => (d.cost > (a?.cost || 0) ? d : a), null);
+  const longest = state.data.longest;
+  const promptTokens = (p.input_tokens || 0) + (p.cache_read_tokens || 0) + (p.cache_write_tokens || 0);
+  const perSource = sourceStats();
+  if (!total) return viewHead("Cost", esc(periodLabel()), periodSeg()) + `<div class="panel"><div class="panel-body">${emptyCost()}</div></div>`;
+  return viewHead("Cost", "API-equivalent: what this usage would cost at published API rates", periodSeg()) + `
+    <div class="grid g-3-2">
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">${esc(periodLabel())}</div><div class="panel-aside">${state.source === "all" ? "By source" : "By token type"}</div></div>
+        <div class="panel-body">
+          <div class="cost-figure"><span class="big num">${usd(total)}</span>${deltaHTML(total, p.prev_cost, days)}</div>
+          ${state.source === "all" ? sourceSplitHTML(perSource, total) : capacityHTML(typeParts, total, "cost-types")}
+          <div class="cost-stats" style="grid-template-columns:repeat(2,minmax(0,1fr))">
+            <div><div class="stat-k">Cache hit rate</div><div class="stat-v">${pct(promptTokens ? p.cache_read_tokens / promptTokens * 100 : 0, 1)}</div></div>
+            <div><div class="stat-k">Saved by caching</div><div class="stat-v">${usd(Math.max(0, p.cost_no_cache - p.cost))}</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head"><div class="panel-title">By model</div><button class="link-btn" data-go="models">All models</button></div>
+        <div class="panel-body" style="padding-top:2px">${capacityHTML(modelParts, total, "cost-models")}</div>
+      </div>
+    </div>
+    ${state.source === "all" ? `<div class="grid g-2">${perSource.map(st => sourceCostPanel(st, total, days)).join("")}</div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Cost per ${series.unit}, by token type</div><div class="panel-aside">${esc(periodLabel())}</div></div>
+      <div class="panel-body">
+        ${chartSlot({
+          items: series.items, height: 220,
+          keys: TOKEN_TYPES.map(([k, label], i) => ["cost_" + k, label, SERIES[i]]),
+          labelOf: it => shortDate(it.t),
+          tipOf: it => tipRows(series.unit === "day" ? fullDate(it.t) : "Week of " + shortDate(it.t),
+            [...TOKEN_TYPES.map(([k, label], i) => [label, usd(it["cost_" + k]), SERIES[i]]).reverse(), ["Total", usd(it.cost)]]),
+        })}
+        <div class="chart-legend">${TOKEN_TYPES.map(([, label], i) => `<span><i style="background:var(${SERIES[i]})"></i>${label}</span>`).join("")}</div>
+      </div>
+    </div>
+    <div class="panel eff four">
+      <div><div class="stat-k">Per message</div><div class="stat-v">${usd(total / Math.max(1, p.message_count))}</div><div class="stat-s">${int(p.message_count)} messages</div></div>
+      <div><div class="stat-k">Per session</div><div class="stat-v">${usd(total / Math.max(1, p.sessions))}</div><div class="stat-s">${int(p.sessions)} sessions</div></div>
+      <div><div class="stat-k">Busiest day${series.unit === "week" ? " (daily view)" : ""}</div><div class="stat-v">${top ? usd(top.cost) : "—"}</div><div class="stat-s">${top ? esc(fullDate(top.t)) : ""}</div></div>
+      <div><div class="stat-k">Longest session</div><div class="stat-v">${longest ? esc(duration(longest.duration_seconds * 1000)) : "—"}</div><div class="stat-s" title="${longest ? esc(sessionName(longest).text) : ""}">${longest ? esc(sessionName(longest).text) : ""}</div></div>
+    </div>`;
+};
+
+function quantileLevels(values) {
+  const nz = values.filter(v => v > 0).sort((a, b) => a - b);
+  const q = f => nz[Math.min(nz.length - 1, Math.floor(nz.length * f))] || 0;
+  const cuts = [q(0.25), q(0.55), q(0.85)];
+  return v => (v <= 0 ? 0 : v <= cuts[0] ? 1 : v <= cuts[1] ? 2 : v <= cuts[2] ? 3 : 4);
+}
+
+function activityPanel() {
+  const now = Date.now();
+  // Noon anchors keep day stepping correct across DST changes.
+  const today = startOfDay(now) + 12 * HOUR;
+  let start = today - 364 * DAY;
+  start -= ((new Date(start).getDay() + 6) % 7) * DAY;
+  const act = state.data.activity || { days: [], hour_weekday: [] };
+  const byDay = new Map(act.days.map(d => [d.day, { cost: d.cost, message_count: d.message_count, sessions: d.session_count }]));
+  const hw = Array.from({ length: 7 }, () => new Array(24).fill(0));
+  for (const r of act.hour_weekday) if (r.weekday >= 0 && r.weekday < 7 && r.hour >= 0 && r.hour < 24) hw[r.weekday][r.hour] += r.cost;
+  const wdCost = hw.map(row => row.reduce((a, v) => a + v, 0));
+  const hasActivity = byDay.size > 0;
+  const lv = quantileLevels([...byDay.values()].map(e => e.cost));
+  let cells = "", months = "", lastMonth = -1, col = 0, active = 0, streak = 0, best = 0;
+  const cols = Math.ceil((today - start) / DAY / 7) + 1;
+  for (let t = start; t <= today + 6 * DAY; t += DAY) {
+    const d = new Date(t), wd = (d.getDay() + 6) % 7;
+    if (wd === 0) {
+      if (d.getMonth() !== lastMonth && t <= today) { months += `<span style="left:${(col / cols) * 100}%">${MONTHS[d.getMonth()]}</span>`; lastMonth = d.getMonth(); }
+      col++;
+    }
+    if (t > today) { cells += `<i class="out"></i>`; continue; }
+    const e = byDay.get(dayKey(t));
+    if (e) { active++; streak++; best = Math.max(best, streak); } else streak = 0;
+    cells += `<i style="background:var(--heat-${lv(e?.cost || 0)})" ${tipAttr(tipRows(fullDate(t), e ? [["Cost", usd(e.cost)], ["Messages", int(e.message_count)], ["Sessions", int(e.sessions)]] : [["No activity", ""]]))}></i>`;
+  }
+  const hwLv = quantileLevels(hw.flat());
+  const hours = `<span></span>` + Array.from({ length: 24 }, (_, h) => `<span class="hl">${h % 3 === 0 ? (h === 0 ? "12a" : h < 12 ? h + "a" : h === 12 ? "12p" : h - 12 + "p") : ""}</span>`).join("");
+  const grid = WEEKDAYS.map((wd, r) => `<span>${wd}</span>` + hw[r].map((v, h) => `<i style="background:var(--heat-${hwLv(v)})" ${tipAttr(tipRows(`${wd} ${h}:00–${h + 1}:00`, [["Cost", usd(v)]]))}></i>`).join("")).join("");
+  const busiestWd = wdCost.indexOf(Math.max(...wdCost));
+  const hourTotals = Array.from({ length: 24 }, (_, h) => hw.reduce((a, row) => a + row[h], 0));
+  const peakHour = hourTotals.indexOf(Math.max(...hourTotals));
+  const fmtHour = h => new Date(2026, 0, 1, h).toLocaleTimeString("en-US", { hour: "numeric" });
+  const scale = `<div class="scale">Less ${[0, 1, 2, 3, 4].map(i => `<i style="background:var(--heat-${i})"></i>`).join("")} More</div>`;
+  return `
+    <div class="panel activity">
+      <div class="panel-head"><div class="panel-title">${icon("activity")}Activity</div><div class="panel-aside">Daily cost and working hours, last 12 months</div></div>
+      <div class="panel-body activity-grid">
+        <div class="heat-scroll"><div class="heat-inner">
+          <div class="heat-months">${months}</div>
+          <div class="heat-wrap"><div class="heat-days">${WEEKDAYS.map((d, i) => `<span>${i % 2 === 0 ? d : ""}</span>`).join("")}</div><div class="heat">${cells}</div></div>
+        </div></div>
+        <div><div class="hw">${hours}${grid}</div></div>
+      </div>
+      <div class="activity-foot">${scale}</div>
+      <div class="eff four">
+        <div><div class="stat-k">Active days</div><div class="stat-v">${active}</div><div class="stat-s">of the last 365</div></div>
+        <div><div class="stat-k">Longest streak</div><div class="stat-v">${best} days</div><div class="stat-s">in a row with a session</div></div>
+        <div><div class="stat-k">Busiest weekday</div><div class="stat-v">${hasActivity ? WEEKDAYS[busiestWd] : "—"}</div><div class="stat-s">${hasActivity ? usd(wdCost[busiestWd]) + " over the year" : ""}</div></div>
+        <div><div class="stat-k">Peak hour</div><div class="stat-v">${hasActivity ? fmtHour(peakHour) : "—"}</div><div class="stat-s">${hasActivity ? "your busiest hour by cost" : ""}</div></div>
+      </div>
+    </div>`;
+}
+
+const SORTS = { end_ts: s => s.end_ts, cost: s => s.cost, message_count: s => s.message_count, tokens: s => s.input_tokens + s.output_tokens + s.cache_read_tokens + s.cache_write_tokens, name: s => sessionName(s).text.toLowerCase() };
+
+views.sessions = () => {
+  const q = state.query.trim().toLowerCase();
+  if (!state.sessions) {
+    return viewHead("Sessions", "") + `<div class="panel"><div class="empty-state">Loading sessions<span class="loading-dots"></span></div></div>`;
+  }
+  let list = state.sessions;
+  if (q) list = list.filter(s => [sessionName(s).text, s.project, s.cwd, s.session_id, s.models].some(v => String(v).toLowerCase().includes(q)));
+  const key = SORTS[state.sort.key];
+  list = [...list].sort((a, b) => { const x = key(a), y = key(b); return (x < y ? -1 : x > y ? 1 : 0) * state.sort.dir; });
+  const th = (k, label, cls = "") => {
+    const on = state.sort.key === k;
+    return `<th class="sortable ${cls}" data-sort="${k}" ${on ? `aria-sort="${state.sort.dir > 0 ? "ascending" : "descending"}"` : ""}>${label}<span class="arrow">${on ? `<svg class="icon" style="width:12px;height:12px;vertical-align:-2px;${state.sort.dir > 0 ? "transform:rotate(180deg)" : ""}" aria-hidden="true"><use href="#i-chevron"/></svg>` : ""}</span></th>`;
+  };
+  const rows = list.slice(0, state.limit).map(s => {
+    const n = sessionName(s);
+    return `<tr data-session="${esc(s.session_id)}">
+      <td class="name-cell"><div class="s-name ${n.kind === "untitled" ? "untitled" : ""}">${n.html}</div><div class="s-meta">${esc(s.project)} · ${esc(s.models.split(",").join(", "))}</div></td>
+      <td class="hide-sm"><span class="src">${glyph(s.source)}${SOURCE_LABEL[s.source]}</span></td>
+      <td class="r">${esc(ago(s.end_ts))}</td>
+      <td class="r hide-sm">${int(s.message_count)}</td>
+      <td class="r hide-sm">${tokens(SORTS.tokens(s))}</td>
+      <td class="r"><b>${usd(s.cost)}</b></td>
+    </tr>`;
+  }).join("");
+  const table = `<div class="panel"><div class="table-wrap"><table class="data">
+    <thead><tr>${th("name", "Session")}<th class="hide-sm">Source</th>${th("end_ts", "Last active", "r")}${th("message_count", "Messages", "r hide-sm")}${th("tokens", "Tokens", "r hide-sm")}${th("cost", "Cost", "r")}</tr></thead>
+    <tbody>${rows || `<tr><td colspan="6"><div class="empty-state">${q ? `No sessions match “${esc(state.query)}”.` : "No sessions yet."}</div></td></tr>`}</tbody>
+  </table></div>${list.length > state.limit ? `<div class="more-row"><button class="link-btn" data-more>Show ${Math.min(40, list.length - state.limit)} more</button></div>` : ""}</div>`;
+  return viewHead("Sessions", `${int(list.length)} ${q ? "matching" : "sessions"} · all time`) + `
+    <div class="toolbar">
+      <label class="search">${icon("search")}<input id="session-q" type="search" placeholder="Search names, projects, paths or IDs" value="${esc(state.query)}" autocomplete="off" spellcheck="false"></label>
+    </div>
+    ${table}`;
+};
+
+/* ===================== Transcript =====================
+   One session as turns: each prompt and everything the agent did until the
+   next one, with what that turn cost. */
+const PROMPT_PREVIEW = 600;
+
+function turnPromptHTML(t) {
+  if (t.kind === "start") return `<div class="turn-prompt none">Before the first prompt</div>`;
+  if (t.kind === "automatic" || !t.prompt) return `<div class="turn-prompt none">Started automatically (no prompt typed)</div>`;
+  const long = t.prompt.length > PROMPT_PREVIEW && !state.expanded.has(String(t.n));
+  const text = long ? t.prompt.slice(0, PROMPT_PREVIEW).trimEnd() + "…" : t.prompt;
+  return `<div class="turn-prompt ${t.kind === "command" ? "command" : ""}">${esc(text)}</div>` +
+    (long ? `<button class="link-btn" data-expand="${t.n}">Show the whole prompt</button>` : "");
+}
+
+function turnHTML(t, max) {
+  const when = t.started_at ? `${fullDate(t.started_at)}, ${clockTime(t.started_at)}` : "";
+  const took = t.started_at && t.ended_at && t.ended_at > t.started_at ? ` · ${duration(t.ended_at - t.started_at)}` : "";
+  const toks = t.input_tokens + t.output_tokens + t.cache_read_tokens + t.cache_write_tokens;
+  const prompt = t.input_tokens + t.cache_read_tokens + t.cache_write_tokens;
+  const meta = [
+    t.models.join(", "),
+    t.message_count ? `${int(t.message_count)} message${t.message_count === 1 ? "" : "s"}` : "no billed messages",
+    toks ? `${tokens(toks)} tokens${prompt ? ` (${pct(t.cache_read_tokens / prompt * 100)} from cache)` : ""}` : "",
+    t.subagent_messages ? `${int(t.subagent_messages)} by sub-agents` : "",
+  ].filter(Boolean).join(" · ");
+  const tools = t.tools.slice(0, 8).map(x => `<span class="chip">${esc(x.name.replace(/^mcp__[^_]+__/, ""))}${x.count > 1 ? ` ×${x.count}` : ""}</span>`).join("")
+    + (t.tools.length > 8 ? `<span class="chip">+${t.tools.length - 8} more</span>` : "");
+  const response = t.response ? `<details class="turn-response"><summary>Response</summary><div class="turn-response-body">${esc(t.response)}${t.response_chars > t.response.length ? `<span class="muted">\n\n… ${int(t.response_chars - t.response.length)} more characters</span>` : ""}</div></details>` : "";
+  return `<div class="turn" id="turn-${t.n}">
+    <div class="turn-head"><span class="turn-n">#${t.n}</span><span class="turn-when">${esc(when + took)}</span>
+      <span class="turn-cost" ${tipAttr(tipRows("Turn #" + t.n, [...TOKEN_TYPES.map(([k, label], i) => [label, usd(t["cost_" + k]), SERIES[i]]), ["Total", usd(t.cost)]]))}>${usd(t.cost)}</span></div>
+    <div class="turn-bar"><span data-w="${max ? t.cost / max * 100 : 0}%"></span></div>
+    ${turnPromptHTML(t)}
+    <div class="turn-meta">${esc(meta)}</div>
+    ${tools ? `<div class="chips">${tools}</div>` : ""}
+    ${response}
+  </div>`;
+}
+
+views.transcript = () => {
+  const back = `<button class="back-link" data-go="sessions">${icon("chevron", 'style="transform:rotate(90deg)"')}Sessions</button>`;
+  const tr = state.transcript;
+  if (!tr || tr.loading) return back + viewHead("Session", "") + `<div class="panel"><div class="empty-state">Reading the session log<span class="loading-dots"></span></div></div>`;
+  if (tr.error) return back + viewHead("Session", "") + `<div class="panel"><div class="empty-state"><h3>Couldn't open this session</h3>${esc(tr.error)}</div></div>`;
+  const s = normSession(tr.data.session);
+  const name = sessionName(s);
+  const all = tr.data.turns.map(t => ({ ...t, started_at: ms(t.started_at), ended_at: ms(t.ended_at) }));
+  const carried = all.filter(t => t.carried_over);
+  const turns = all.filter(t => !t.carried_over).map((t, i) => ({ ...t, n: i + 1 }));
+  const max = Math.max(0, ...turns.map(t => t.cost));
+  const top = turns.reduce((a, t) => (t.cost > (a?.cost ?? -1) ? t : a), null);
+  const ordered = state.turnSort === "cost" ? [...turns].sort((a, b) => b.cost - a.cost) : turns;
+  const models = s.models.split(",").filter(Boolean).join(", ");
+  const sub = [`${glyph(s.source)}${SOURCE_LABEL[s.source]}`, esc(s.project || ""), s.start_ts ? esc(`${fullDate(s.start_ts)}, ${clockTime(s.start_ts)}`) : "",
+    s.end_ts && s.start_ts ? esc(duration(s.end_ts - s.start_ts)) : "", esc(models)].filter(Boolean).join(" · ");
+  const carriedRow = carried.length ? `<div class="carried"><span>${int(carried.length)} earlier turn${carried.length === 1 ? "" : "s"} carried over from the session this one was resumed from. Their cost is counted there.</span>
+      <button class="link-btn" data-carried>${state.showCarried ? "Hide" : "Show"}</button></div>
+      ${state.showCarried ? carried.map((t, i) => turnHTML({ ...t, n: "e" + (i + 1) }, max)).join("") : ""}` : "";
+  return back + `<div class="view-head"><div style="min-width:0"><h1 class="transcript-title">${name.html}</h1><div class="sub transcript-sub">${sub}</div></div>
+      <div class="transcript-total"><span class="big num">${usd(s.cost)}</span><button class="copy" data-copy="${esc(s.session_id)}" title="${esc(s.session_id)}">Copy session ID</button></div></div>
+    <div class="panel eff four">
+      <div><div class="stat-k">Turns</div><div class="stat-v">${int(turns.length)}</div><div class="stat-s">${carried.length ? `plus ${int(carried.length)} carried over` : "prompts you typed"}</div></div>
+      <div><div class="stat-k">Per turn</div><div class="stat-v">${usd(turns.length ? s.cost / turns.length : 0)}</div><div class="stat-s">average</div></div>
+      <div><div class="stat-k">Most expensive turn</div><div class="stat-v">${top ? usd(top.cost) : "—"}</div><div class="stat-s">${top ? `#${top.n} · ${pct(s.cost ? top.cost / s.cost * 100 : 0)} of the session` : ""}</div></div>
+      <div><div class="stat-k">Messages</div><div class="stat-v">${int(s.message_count)}</div><div class="stat-s">${tokens(s.input_tokens + s.output_tokens + s.cache_read_tokens + s.cache_write_tokens)} tokens</div></div>
+    </div>
+    ${turns.length > 1 ? `<div class="panel">
+      <div class="panel-head"><div class="panel-title">Cost per turn</div><div class="panel-aside">Click a bar to jump to its turn</div></div>
+      <div class="panel-body">${chartSlot({
+        items: turns, height: 150, keys: [["cost", "Cost", "--plan"]],
+        labelOf: t => "#" + t.n, attrOf: t => `data-turn-jump="${t.n}"`,
+        tipOf: t => tipRows("Turn #" + t.n, [["Cost", usd(t.cost)], ["Prompt", (t.prompt || "—").replace(/\s+/g, " ").slice(0, 60) + ((t.prompt || "").length > 60 ? "…" : "")]]),
+      })}</div></div>` : ""}
+    <div class="panel">
+      <div class="panel-head"><div class="panel-title">Turns</div>
+        <div class="seg compact" role="group" aria-label="Order"><button data-turn-sort="order" aria-pressed="${state.turnSort === "order"}">In order</button><button data-turn-sort="cost" aria-pressed="${state.turnSort === "cost"}">Most expensive</button></div></div>
+      <div class="turns">${carriedRow}${ordered.length ? ordered.map(t => turnHTML(t, max)).join("") : `<div class="empty-state">This session has no turns yet.</div>`}</div>
+    </div>`;
+};
+
+function shareList(items, nameOf, metaOf, emptyText) {
+  const total = items.reduce((a, m) => a + m.cost, 0);
+  if (!items.length) return `<div class="panel"><div class="empty-state">${emptyText}</div></div>`;
+  return `<div class="panel rows">${items.map(m => `
+    <div class="list-row share-row" ${tipAttr(tipRows(nameOf(m).text, [["Cost", usd(m.cost)], ["Share", pct(m.cost / total * 100, 1)], ["Messages", int(m.message_count)], ["Sessions", int(m.sessions)]]))}>
+      <div style="min-width:0"><div class="s-name" style="display:flex;align-items:center;gap:8px">${nameOf(m).html}</div><div class="share-meta">${metaOf(m)}</div></div>
+      <div class="share-bar-cell"><div class="share-bar"><span data-w="${(m.cost / items[0].cost) * 100}%"></span></div></div>
+      <div style="text-align:right"><div class="s-cost">${usd(m.cost)}</div><div class="s-when">${pct(m.cost / total * 100)} of total</div></div>
+    </div>`).join("")}</div>`;
+}
+
+views.projects = () => {
+  const projects = state.data.by_project;
+  return viewHead("Projects", `${projects.length} with usage · ${esc(periodLabel().toLowerCase())}`, periodSeg()) +
+    shareList(projects, m => ({ text: m.project, html: `${icon("folder")}${esc(m.project)}` }),
+      m => `${esc(m.cwd || "")} · ${int(m.sessions)} sessions · mostly ${esc(m.top_model || "—")}`,
+      "No project activity in this period.");
+};
+
+views.models = () => {
+  const models = state.data.by_model;
+  return viewHead("Models", `${models.length} used · ${esc(periodLabel().toLowerCase())}`, periodSeg()) +
+    shareList(models, m => ({ text: m.model, html: `${glyph(m.source)}${esc(m.model)}` }),
+      m => { const prompt = m.input_tokens + m.cache_read_tokens + m.cache_write_tokens; return `${tokens(prompt + m.output_tokens)} tokens · ${pct(prompt ? m.cache_read_tokens / prompt * 100 : 0)} from cache · ${int(m.message_count)} messages`; },
+      "No model usage in this period.");
+};
+
+/* ===================== Shell ===================== */
+function renderSidebar() {
+  document.querySelectorAll("#source-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.source === state.source));
+  document.querySelectorAll(".nav a").forEach(a => {
+    if (a.dataset.view === (state.view === "transcript" ? "sessions" : state.view)) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  if (!state.data) { $("#sync").innerHTML = ""; return; }
+  $("#nav-session-count").textContent = state.data.session_total ? int(state.data.session_total) : "";
+  const levels = sourcesShown().map(s => state.data.limits[s]).filter(s => s.status === "ok").flatMap(s => {
+    const out = [s.five_hour?.pct, s.weekly?.pct].filter(v => v != null).map(level);
+    if (s.forecast?.exhaustion_at && s.weekly && s.forecast.exhaustion_at < s.weekly.end) out.push("crit");
+    return out;
+  });
+  const alert = $("#nav-limit-alert");
+  alert.hidden = !levels.some(l => l !== "ok");
+  alert.className = "nav-alert" + (levels.includes("crit") ? "" : " warn");
+  alert.title = levels.includes("crit") ? "A limit is about to run out" : "A limit is above 75%";
+  const lines = ["claude", "codex"].map(s => {
+    const src = state.data.limits[s];
+    const text = src.status === "ok" ? `${SOURCE_LABEL[s]} · synced ${ago(src.synced_at)}`
+      : src.status === "missing" ? `${SOURCE_LABEL[s]} · not installed`
+      : src.status === "error" ? `${SOURCE_LABEL[s]} · sync failed` : `${SOURCE_LABEL[s]} · not synced yet`;
+    return `<div class="sync-line" ${src.status === "error" ? `title="${esc(src.error || "")}"` : ""}><span class="dot ${src.status === "ok" ? "" : src.status === "error" ? "err" : "off"}"></span>${esc(text)}</div>`;
+  }).join("");
+  $("#sync").innerHTML = lines + `<button class="sync-btn" id="sync-btn">${icon("sync")}Sync now</button>`;
+}
+
+function render() {
+  tips.clear();
+  charts.length = 0;
+  renderSidebar();
+  document.querySelectorAll(".view").forEach(v => { v.hidden = v.dataset.view !== state.view; });
+  const el = $("#view-" + state.view);
+  if (!state.data) {
+    el.innerHTML = viewHead({ overview: "Overview", limits: "Limits", cost: "Cost", sessions: "Sessions", projects: "Projects", models: "Models" }[state.view], "") + (state.error
+      ? `<div class="panel"><div class="empty-state"><h3>Couldn't load your usage</h3>${esc(state.error)}<p style="margin:10px 0 0"><button class="sync-btn" data-retry>Try again</button></p></div></div>`
+      : `<div class="panel"><div class="empty-state"><h3>Reading your logs<span class="loading-dots"></span></h3>The first launch indexes every Claude Code and Codex session on this Mac, which can take a minute. Nothing leaves your computer.</div></div>`);
+    return;
+  }
+  el.innerHTML = (state.error ? `<div class="forecast crit" style="margin-bottom:16px">${icon("alert")}<div>Couldn't refresh: ${esc(state.error)}</div></div>` : "") + views[state.view]();
+  if (state.view === "overview") fillOverview();
+  // On narrow screens the year heatmap scrolls; open it on the latest weeks.
+  el.querySelectorAll(".heat-scroll").forEach(h => { h.scrollLeft = h.scrollWidth; });
+  drawCharts();
+  settle(el);
+}
+
+function openTranscript(id) {
+  const hash = "#session/" + encodeURIComponent(id);
+  if (location.hash !== hash) history.replaceState(null, "", hash);
+  if (state.transcriptId !== id) {
+    state.transcriptId = id;
+    state.turnSort = "order";
+    state.expanded = new Set();
+    state.showCarried = false;
+    loadTranscript(id);
+  }
+  state.view = "transcript";
+  render();
+  window.scrollTo(0, 0);
+}
+
+function go(view) {
+  if (view.startsWith("session/")) { openTranscript(decodeURIComponent(view.slice(8))); return; }
+  if (!views[view] || view === "transcript") view = "overview";
+  if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
+  state.view = view;
+  if (view === "sessions" && !state.sessions && state.data) refresh();
+  render();
+  $("#main").scrollTop = 0;
+  window.scrollTo(0, 0);
+}
+
+document.addEventListener("click", e => {
+  const t = e.target;
+  const navLink = t.closest(".nav a");
+  if (navLink) { e.preventDefault(); go(navLink.dataset.view); return; }
+  const goBtn = t.closest("[data-go]");
+  if (goBtn) { go(goBtn.dataset.go); return; }
+  const periodBtn = t.closest("[data-period]");
+  if (periodBtn) {
+    if (periodBtn.dataset.period === state.period) return;
+    state.period = periodBtn.dataset.period; save("usage-period", state.period);
+    document.querySelectorAll("[data-period]").forEach(b => b.setAttribute("aria-pressed", b.dataset.period === state.period));
+    refresh(); return;
+  }
+  const srcBtn = t.closest("[data-source]");
+  if (srcBtn) {
+    if (srcBtn.dataset.source === state.source) return;
+    state.source = srcBtn.dataset.source; save("usage-source", state.source);
+    state.sessions = state.view === "sessions" ? state.sessions : null;
+    document.querySelectorAll("#source-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.source === state.source));
+    refresh(); return;
+  }
+  if (t.closest("[data-retry]")) { state.error = null; render(); refresh(); return; }
+  if (t.closest("#sync-btn")) {
+    const btn = t.closest("#sync-btn");
+    btn.classList.add("spinning"); btn.disabled = true;
+    (async () => {
+      for (const s of ["claude", "codex"]) {
+        try { await fetch(`/api/remote-usage/poll?source=${s}`, { method: "POST" }); } catch (err) {}
+      }
+      await refresh();
+    })();
+    return;
+  }
+  const sort = t.closest("th[data-sort]");
+  if (sort) {
+    const k = sort.dataset.sort;
+    state.sort = state.sort.key === k ? { key: k, dir: -state.sort.dir } : { key: k, dir: k === "name" ? 1 : -1 };
+    render(); return;
+  }
+  if (t.closest("[data-more]")) { state.limit += 40; render(); return; }
+  const sortTurns = t.closest("[data-turn-sort]");
+  if (sortTurns) { state.turnSort = sortTurns.dataset.turnSort; render(); return; }
+  const expand = t.closest("[data-expand]");
+  if (expand) { state.expanded.add(expand.dataset.expand); render(); return; }
+  if (t.closest("[data-carried]")) { state.showCarried = !state.showCarried; render(); return; }
+  const jump = t.closest("[data-turn-jump]");
+  if (jump) {
+    if (state.turnSort !== "order") { state.turnSort = "order"; render(); }
+    const target = document.getElementById("turn-" + jump.dataset.turnJump);
+    if (target) {
+      target.scrollIntoView({ behavior: reducedMotion ? "auto" : "smooth", block: "center" });
+      target.classList.remove("flash"); void target.offsetWidth; target.classList.add("flash");
+    }
+    return;
+  }
+  const copy = t.closest("[data-copy]");
+  if (copy) {
+    const label = copy.textContent;
+    navigator.clipboard?.writeText(copy.dataset.copy).then(() => { copy.textContent = "Copied"; setTimeout(() => { copy.textContent = label; }, 1400); }, () => {});
+    return;
+  }
+  const row = t.closest("[data-session]");
+  if (row) openTranscript(row.dataset.session);
+});
+
+document.addEventListener("input", e => {
+  if (e.target.id === "session-q") {
+    state.query = e.target.value;
+    state.limit = 40;
+    const pos = e.target.selectionStart;
+    render();
+    const input = $("#session-q");
+    input.focus();
+    input.setSelectionRange(pos, pos);
+  }
+});
+
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render());
+addEventListener("hashchange", () => go(location.hash.slice(1)));
+
+go(location.hash.slice(1) || "overview");
+refresh();
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>

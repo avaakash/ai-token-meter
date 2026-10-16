@@ -1,0 +1,750 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Token Meter: Claude Code and Codex limits in your menu bar</title>
+<meta name="description" content="A tiny native Mac app that shows your Claude Code and Codex rate limits in the menu bar, warns you before you run out, and works out what your usage would cost at API prices. Everything stays on your Mac.">
+<meta property="og:title" content="Token Meter">
+<meta property="og:description" content="Your Claude Code and Codex limits in the menu bar, plus the API bill you're not paying.">
+<meta property="og:image" content="https://avaakash.github.io/claude-api-pricing-visualizer/assets/screenshots/overview-light.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" href="assets/icon.png">
+<link rel="apple-touch-icon" href="assets/icon.png">
+<style>
+  :root {
+    color-scheme: light;
+    --ground: #f0f0f2;
+    --sidebar: #e7e7ea;
+    --panel: #ffffff;
+    --panel-2: #f6f6f8;
+    --hair: rgba(0, 0, 0, 0.085);
+    --hair-strong: rgba(0, 0, 0, 0.14);
+    --ink: #1d1d1f;
+    --ink-2: #4f4f55;
+    --ink-3: #6b6b71;
+    --track: #e5e5ea;
+    --plan: #2a78d6;
+    --plan-soft: #b7d3f6;
+    --plan-ink: #1c5cab;
+    --plan-wash: rgba(42, 120, 214, 0.10);
+    --warn: #fab219;
+    --warn-ink: #8a5a00;
+    --warn-wash: rgba(250, 178, 25, 0.16);
+    --crit: #d03b3b;
+    --crit-ink: #b42a2a;
+    --crit-wash: rgba(208, 59, 59, 0.10);
+    --menubar: rgba(246, 246, 248, 0.78);
+    --menu: rgba(250, 250, 252, 0.86);
+    --menu-shadow: 0 12px 40px rgba(20, 20, 30, 0.18), 0 2px 6px rgba(20, 20, 30, 0.08);
+    --window-shadow: 0 30px 80px rgba(20, 20, 30, 0.16), 0 4px 14px rgba(20, 20, 30, 0.08);
+    --status-warn: #c46a00;
+    --status-crit: #d0302a;
+    --code: #1d1d1f;
+    --code-ink: #f2f2f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --ground: #1b1b1d; --sidebar: #222225; --panel: #262628; --panel-2: #2d2d30;
+      --hair: rgba(255, 255, 255, 0.085); --hair-strong: rgba(255, 255, 255, 0.15);
+      --ink: #f2f2f4; --ink-2: #c2c2c8; --ink-3: #a0a0a8;
+      --track: #3a3a3f; --plan: #3987e5; --plan-soft: #1c5cab; --plan-ink: #86b6ef; --plan-wash: rgba(57, 135, 229, 0.16);
+      --warn: #fab219; --warn-ink: #f5c04a; --warn-wash: rgba(250, 178, 25, 0.14);
+      --crit: #d03b3b; --crit-ink: #ff8a80; --crit-wash: rgba(208, 59, 59, 0.18);
+      --menubar: rgba(30, 30, 33, 0.72);
+      --menu: rgba(40, 40, 43, 0.86);
+      --menu-shadow: 0 14px 44px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+      --window-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+      --status-warn: #ff9f0a;
+      --status-crit: #ff6961;
+      --code: #0f0f11;
+      --code-ink: #f2f2f4;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; scroll-padding-top: 48px; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection { background: var(--plan-wash); color: var(--ink); }
+  :focus-visible { outline: 2px solid var(--plan); outline-offset: 2px; border-radius: 6px; }
+  a { color: var(--plan-ink); text-underline-offset: 3px; }
+  button { font: inherit; color: inherit; }
+  code, kbd, pre { font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .icon { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .wrap { width: min(1180px, 100% - 32px); margin: 0 auto; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* Menu bar: the site's navigation, at the size the real one has. */
+  .menubar {
+    position: sticky; top: 0; z-index: 20; height: 30px;
+    display: flex; align-items: center; gap: 2px; padding: 0 10px;
+    background: var(--menubar); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: 0 1px 0 var(--hair); font-size: 13.5px; white-space: nowrap;
+  }
+  .menubar a, .menubar .item {
+    display: inline-flex; align-items: center; gap: 6px; height: 24px; padding: 0 9px; border-radius: 5px;
+    color: var(--ink); text-decoration: none;
+  }
+  .menubar a:hover { background: var(--hair); }
+  .menubar .app { font-weight: 700; }
+  .menubar .app img { width: 16px; height: 16px; border-radius: 4px; }
+  .menubar .spacer { flex: 1; }
+  .menubar .status { font-weight: 500; }
+  .menubar .status.open { background: var(--hair-strong); }
+  .menubar .status .icon { width: 17px; height: 17px; stroke-width: 1.5; }
+  .menubar .status[data-level="warn"] .txt { color: var(--status-warn); }
+  .menubar .status[data-level="crit"] .txt { color: var(--status-crit); }
+  .menubar .clock { color: var(--ink); }
+
+  /* Hero */
+  .hero { position: relative; padding: clamp(36px, 5vw, 64px) 0 0; }
+  .hero-top { position: relative; }
+  .hero h1 {
+    margin: 0; max-width: 11ch; font-size: clamp(44px, 6.4vw, 84px); line-height: 0.98; font-weight: 700;
+    letter-spacing: -0.04em; text-wrap: balance;
+  }
+  .hero .lede { margin: 20px 0 0; max-width: min(34em, 100% - 360px); font-size: clamp(17px, 1.6vw, 20px); line-height: 1.5; color: var(--ink-2); text-wrap: pretty; }
+  .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; margin-top: 28px; }
+  .btn-download {
+    display: inline-flex; align-items: center; gap: 12px; padding: 12px 22px 12px 18px; border-radius: 14px;
+    background: var(--ink); color: var(--ground); text-decoration: none;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s;
+  }
+  .btn-download:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(20, 20, 30, 0.18); }
+  .btn-download:active { transform: translateY(0); }
+  .btn-download .icon { width: 22px; height: 22px; stroke-width: 2; }
+  .btn-download b { display: block; font-size: 18px; font-weight: 650; letter-spacing: -0.01em; line-height: 1.2; }
+  .btn-download small { display: block; font-size: 12px; opacity: 0.68; }
+  .link-quiet { color: var(--ink-2); font-weight: 550; text-decoration: none; }
+  .link-quiet:hover { color: var(--ink); text-decoration: underline; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 22px 0 0; padding: 0; list-style: none; font-size: 13px; color: var(--ink-3); }
+  .badges li { display: inline-flex; align-items: center; gap: 6px; }
+  .badges .icon { width: 14px; height: 14px; }
+
+  /* The status item's menu, hanging under the menu bar as it does in life. */
+  .menu {
+    position: absolute; top: calc(-1 * clamp(40px, 7vw, 88px) + 4px); right: 0; width: 330px; padding: 5px;
+    background: var(--menu); backdrop-filter: saturate(180%) blur(24px); -webkit-backdrop-filter: saturate(180%) blur(24px);
+    border-radius: 10px; box-shadow: var(--menu-shadow), 0 0 0 0.5px var(--hair-strong);
+    font-size: 13.5px; line-height: 1.3; z-index: 5;
+  }
+  .menu .head { padding: 5px 10px 2px; font-weight: 650; color: var(--ink); }
+  .menu .row { display: flex; justify-content: space-between; gap: 12px; padding: 3.5px 10px; border-radius: 5px; color: var(--ink-3); }
+  .menu .row.act { color: var(--ink); }
+  .menu .row.act:hover { background: var(--plan); color: #fff; }
+  .menu .row.act:hover kbd { color: rgba(255, 255, 255, 0.8); }
+  .menu .row .check { width: 14px; display: inline-block; }
+  .menu kbd { font: inherit; color: var(--ink-3); }
+  .menu hr { border: 0; height: 1px; background: var(--hair); margin: 5px 10px; }
+  .menu .pct { color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .menu-note { position: absolute; right: 0; top: calc(100% + 10px); width: 330px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
+
+  /* The day: a timeline you scrub through. */
+  .day { margin-top: clamp(40px, 4.5vw, 56px); padding: 22px 24px 20px; background: var(--panel); border-radius: 16px; box-shadow: 0 0 0 1px var(--hair); }
+  .day-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 20px; }
+  .day-head h2 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.005em; }
+  .day-head p { margin: 0; font-size: 13px; color: var(--ink-3); }
+  .day-body { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 28px; margin-top: 18px; align-items: end; }
+  .timeline { position: relative; padding-top: 34px; }
+  .bands { position: absolute; inset: 0 0 auto 0; height: 26px; }
+  .band {
+    position: absolute; top: 0; height: 22px; display: flex; align-items: center; padding: 0 8px;
+    border-radius: 6px; background: var(--plan-wash); color: var(--plan-ink); font-size: 11.5px; font-weight: 600; white-space: nowrap; overflow: hidden;
+  }
+  .bars { position: relative; display: flex; align-items: flex-end; gap: 2px; height: 104px; border-bottom: 1px solid var(--hair-strong); }
+  .bars i { flex: 1; min-height: 2px; border-radius: 3px 3px 0 0; background: var(--track); transition: background 0.15s; }
+  .bars i.past { background: var(--plan); }
+  .ticks { position: relative; height: 22px; font-size: 11px; color: var(--ink-3); }
+  .ticks span { position: absolute; top: 6px; transform: translateX(-50%); }
+  .playhead { position: absolute; top: 28px; bottom: 22px; width: 2px; margin-left: -1px; background: var(--ink); opacity: 0.75; pointer-events: none; }
+  .playhead::before {
+    content: attr(data-time); position: absolute; top: -24px; left: 50%; transform: translateX(-50%);
+    padding: 2px 7px; border-radius: 6px; background: var(--ink); color: var(--panel); font-size: 11.5px; font-weight: 600; white-space: nowrap;
+  }
+  .playhead[data-edge="start"]::before { left: -1px; transform: none; }
+  .playhead[data-edge="end"]::before { left: auto; right: -1px; transform: none; }
+  .scrub { position: absolute; inset: 28px 0 0 0; width: 100%; height: calc(100% - 28px); margin: 0; opacity: 0; cursor: ew-resize; }
+  .scrub:focus-visible + .playhead { outline: 2px solid var(--plan); outline-offset: 3px; }
+  .readout { display: grid; gap: 14px; }
+  .meter-k { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; font-weight: 600; }
+  .meter-k b { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; }
+  .meter-k b small { font-size: 12px; font-weight: 400; color: var(--ink-3); margin-left: 3px; }
+  .meter { position: relative; height: 10px; margin-top: 6px; border-radius: 5px; background: var(--track); overflow: hidden; }
+  .meter .fill { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--plan); transition: background 0.2s; }
+  .meter[data-level="warn"] .fill { background: var(--warn); }
+  .meter[data-level="crit"] .fill { background: var(--crit); }
+  .meter .cuts { position: absolute; inset: 0; display: flex; }
+  .meter .cuts span { flex: 1; border-right: 2px solid var(--panel); }
+  .meter .cuts span:last-child { border-right: 0; }
+  .cost-now { padding-top: 12px; border-top: 1px solid var(--hair); }
+  .cost-now b { display: block; font-size: 28px; font-weight: 650; letter-spacing: -0.025em; line-height: 1.1; }
+  .cost-now span { font-size: 12.5px; color: var(--ink-3); }
+  .day-note { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 9px 12px; border-radius: 8px; background: var(--panel-2); color: var(--ink-2); font-size: 13.5px; }
+  .day-note[data-level="warn"] { background: var(--warn-wash); color: var(--ink); }
+  .day-note[data-level="warn"] .icon { color: var(--warn-ink); }
+  .day-note[data-level="crit"] { background: var(--crit-wash); color: var(--ink); }
+  .day-note[data-level="crit"] .icon { color: var(--crit-ink); }
+
+  /* Sections */
+  section { padding: clamp(72px, 10vw, 128px) 0 0; }
+  .sec-title { margin: 0; max-width: 18ch; font-size: clamp(32px, 4.4vw, 52px); line-height: 1.04; font-weight: 700; letter-spacing: -0.035em; text-wrap: balance; }
+  .sec-lede { margin: 16px 0 0; max-width: 36em; font-size: 18px; color: var(--ink-2); text-wrap: pretty; }
+
+  /* Tour: the app's own source list drives the window beside it. */
+  .tour { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 36px; margin-top: 44px; align-items: start; }
+  .views { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; position: sticky; top: 56px; }
+  .views button {
+    display: grid; grid-template-columns: 20px 1fr; gap: 2px 10px; width: 100%; padding: 9px 12px; border: 0; border-radius: 9px;
+    background: none; text-align: left; cursor: pointer; color: var(--ink-2);
+  }
+  .views button .icon { width: 18px; height: 18px; margin-top: 2px; }
+  .views button b { font-weight: 550; font-size: 15px; color: var(--ink); }
+  .views button p { grid-column: 2; margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--ink-3); display: none; }
+  .views button:hover { background: var(--hair); }
+  .views button[aria-selected="true"] { background: var(--plan-wash); }
+  .views button[aria-selected="true"] .icon { color: var(--plan); }
+  .views button[aria-selected="true"] b { font-weight: 650; }
+  .views button[aria-selected="true"] p { display: block; color: var(--ink-2); }
+  .views .group { padding: 14px 12px 4px; font-size: 12px; font-weight: 600; color: var(--ink-3); }
+  .views .group:first-child { padding-top: 0; }
+
+  .window { border-radius: 12px; overflow: hidden; background: var(--sidebar); box-shadow: var(--window-shadow), 0 0 0 0.5px var(--hair-strong); }
+  .titlebar { position: relative; height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 12px; background: var(--sidebar); box-shadow: inset 0 -1px 0 var(--hair); }
+  .titlebar i { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.12); }
+  .titlebar i:nth-child(1) { background: #ff5f57; }
+  .titlebar i:nth-child(2) { background: #febc2e; }
+  .titlebar i:nth-child(3) { background: #28c840; }
+  .titlebar span { position: absolute; left: 50%; transform: translateX(-50%); font-size: 13px; font-weight: 600; color: var(--ink-2); }
+  .shot { position: relative; aspect-ratio: 1280 / 820; background: var(--ground); }
+  .shot img { display: block; width: 100%; height: 100%; transition: opacity 0.18s; }
+  .shot.swapping img { opacity: 0.35; }
+  .hit { position: absolute; left: 1%; width: 16.4%; height: 4%; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 8px; }
+  .hit:hover { background: var(--hair); mix-blend-mode: multiply; }
+  .shot-caption { margin: 12px 2px 0; font-size: 13px; color: var(--ink-3); }
+  .shot-desc { display: none; margin: 0 0 12px; color: var(--ink-2); font-size: 15px; }
+
+  /* Promises */
+  .promises { margin: 44px 0 0; padding: 0; list-style: none; border-top: 1px solid var(--hair-strong); }
+  .promises li { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr); gap: 8px 40px; padding: 24px 0; border-bottom: 1px solid var(--hair); }
+  .promises h3 { margin: 0; font-size: 21px; font-weight: 650; letter-spacing: -0.015em; line-height: 1.25; }
+  .promises p { margin: 0; color: var(--ink-2); max-width: 38em; }
+
+  /* How it works */
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr; align-items: stretch; gap: 0; margin-top: 44px; }
+  .node { padding: 20px 22px; background: var(--panel); border-radius: 12px; box-shadow: 0 0 0 1px var(--hair); }
+  .node h3 { margin: 0 0 10px; font-size: 15px; font-weight: 650; }
+  .node code { display: block; font-size: 12.5px; color: var(--ink-2); line-height: 1.8; overflow-wrap: anywhere; }
+  .node p { margin: 10px 0 0; font-size: 13.5px; color: var(--ink-3); }
+  .arrow { display: grid; place-items: center; width: 44px; color: var(--ink-3); }
+  .arrow .icon { width: 22px; height: 22px; }
+
+  /* Install */
+  .install { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 40px; margin-top: 44px; align-items: start; }
+  .steps { margin: 0; padding: 0; list-style: none; counter-reset: step; }
+  .steps li { position: relative; padding: 0 0 22px 48px; counter-increment: step; }
+  .steps li::before {
+    content: counter(step); position: absolute; left: 0; top: -2px; width: 30px; height: 30px; display: grid; place-items: center;
+    border-radius: 50%; background: var(--panel); box-shadow: 0 0 0 1px var(--hair-strong); font-size: 14px; font-weight: 650;
+  }
+  .steps h3 { margin: 0; font-size: 17px; font-weight: 650; }
+  .steps p { margin: 4px 0 0; color: var(--ink-2); }
+  .callout { margin-top: 6px; padding: 16px 18px; border-radius: 12px; background: var(--panel-2); box-shadow: 0 0 0 1px var(--hair); font-size: 14.5px; color: var(--ink-2); }
+  .callout b { color: var(--ink); }
+  .path { font-weight: 600; color: var(--ink); white-space: nowrap; }
+  .source-panel { padding: 22px; background: var(--panel); border-radius: 14px; box-shadow: 0 0 0 1px var(--hair); }
+  .source-panel h3 { margin: 0; font-size: 17px; font-weight: 650; }
+  .source-panel > p { margin: 6px 0 0; color: var(--ink-2); font-size: 14.5px; }
+  .code { position: relative; margin: 16px 0 0; padding: 44px 18px 16px; border-radius: 10px; background: var(--code); color: var(--code-ink); font-size: 13px; line-height: 1.7; overflow-x: auto; }
+  .code .prompt { color: #8e8e96; user-select: none; }
+  .copy {
+    position: absolute; top: 10px; right: 10px; padding: 4px 10px; font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif; border: 0; border-radius: 7px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.12); color: #f2f2f4; font-size: 12px; font-weight: 600;
+  }
+  .copy:hover { background: rgba(255, 255, 255, 0.2); }
+  .reqs { margin: 18px 0 0; padding: 0; list-style: none; font-size: 14px; color: var(--ink-2); }
+  .reqs li { padding: 8px 0; border-top: 1px solid var(--hair); }
+
+  /* FAQ */
+  .faq { margin-top: 36px; max-width: 820px; border-top: 1px solid var(--hair-strong); }
+  .faq details { border-bottom: 1px solid var(--hair); }
+  .faq summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 0; cursor: pointer; list-style: none; font-size: 17px; font-weight: 600; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary .icon { color: var(--ink-3); transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  .faq details[open] summary .icon { transform: rotate(180deg); }
+  .faq details p { margin: -6px 0 18px; max-width: 42em; color: var(--ink-2); }
+
+  /* Close */
+  .close { padding: clamp(88px, 12vw, 150px) 0 clamp(56px, 8vw, 96px); text-align: center; }
+  .close img { width: 112px; height: 112px; }
+  .close h2 { margin: 18px auto 0; max-width: 16ch; font-size: clamp(34px, 5vw, 60px); line-height: 1.02; font-weight: 700; letter-spacing: -0.04em; text-wrap: balance; }
+  .close .actions { justify-content: center; }
+  footer { padding: 24px 0 40px; border-top: 1px solid var(--hair); font-size: 13px; color: var(--ink-3); }
+  footer .wrap { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 24px; }
+  footer a { color: var(--ink-2); }
+
+  @media (max-width: 1100px) {
+    .menu { width: 300px; }
+    .menu-note { width: 300px; }
+  }
+  @media (max-width: 960px) {
+    .hero-top { min-height: 0; }
+    .hero .lede { max-width: 34em; }
+    .menu { position: relative; top: auto; right: auto; width: auto; max-width: 420px; margin: 40px 0 0; }
+    .menu-note { position: static; width: auto; max-width: 420px; margin: 10px 0 0; text-align: left; }
+    .day-body { grid-template-columns: minmax(0, 1fr); }
+    .readout { grid-template-columns: 1fr 1fr; }
+    .cost-now { grid-column: 1 / -1; }
+    .tour { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+    .views { position: static; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+    .views .group { display: none; }
+    .views button { display: flex; align-items: center; gap: 8px; width: auto; white-space: nowrap; padding: 8px 12px; }
+    .views button p { display: none !important; }
+    .views button .icon { margin: 0; }
+    .shot-desc { display: block; }
+    .promises li { grid-template-columns: minmax(0, 1fr); }
+    .flow { grid-template-columns: minmax(0, 1fr); }
+    .arrow { width: auto; height: 40px; }
+    .arrow .icon { transform: rotate(90deg); }
+    .install { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .menubar .nav, .menubar .clock { display: none; }
+    .day { padding: 18px 16px 16px; }
+    .bars { height: 96px; gap: 1px; }
+    .ticks span:nth-child(even) { display: none; }
+    .band { font-size: 10.5px; padding: 0 6px; }
+    .band-k { display: none; }
+    .meter-k { font-size: 12px; white-space: nowrap; }
+    .meter-k b { font-size: 17px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-overview" viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="6" rx="1.6"/><rect x="11" y="3" width="6" height="6" rx="1.6"/><rect x="3" y="11" width="6" height="6" rx="1.6"/><rect x="11" y="11" width="6" height="6" rx="1.6"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 20 20"><path d="M3.2 14.5a7 7 0 1 1 13.6 0"/><path d="M10 12.5 13.2 7.6"/><circle cx="10" cy="12.8" r="1.1"/></symbol>
+    <symbol id="i-cost" viewBox="0 0 20 20"><path d="M5 2.8h10v14.4l-1.9-1.2-1.6 1.2-1.5-1.2-1.5 1.2-1.6-1.2L5 17.2z"/><path d="M7.6 6.6h4.8M7.6 9.6h4.8M7.6 12.6h2.6"/></symbol>
+    <symbol id="i-sessions" viewBox="0 0 20 20"><path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/><circle cx="4" cy="5.5" r="0.9"/><circle cx="4" cy="10" r="0.9"/><circle cx="4" cy="14.5" r="0.9"/></symbol>
+    <symbol id="i-turns" viewBox="0 0 20 20"><path d="M4 16.5V11M8 16.5V6M12 16.5V9M16 16.5V3.5"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.8 6.2a1.8 1.8 0 0 1 1.8-1.8h3.2l1.8 1.9h5.8a1.8 1.8 0 0 1 1.8 1.8v6.7a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8z"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8"/><rect x="8.3" y="8.3" width="3.4" height="3.4" rx="0.6"/><path d="M8 2.8v2.7M12 2.8v2.7M8 14.5v2.7M12 14.5v2.7M2.8 8h2.7M2.8 12h2.7M14.5 8h2.7M14.5 12h2.7"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.4 17.3 16H2.7z"/><path d="M10 8.2v3.6"/><circle cx="10" cy="13.9" r="0.4"/></symbol>
+    <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 9v4.6"/><circle cx="10" cy="6.4" r="0.4"/></symbol>
+    <symbol id="i-check" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="m6.9 10.2 2.1 2.1 4.1-4.4"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 20 20"><path d="M16 8.2A6.3 6.3 0 0 0 4.6 6.4M4 11.8a6.3 6.3 0 0 0 11.4 1.8"/><path d="M4.4 3.6v3h3M15.6 16.4v-3h-3"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 20 20"><path d="m6 8 4 4 4-4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 20 20"><path d="M3.5 10h13M11.5 5l5 5-5 5"/></symbol>
+    <symbol id="i-download" viewBox="0 0 20 20"><path d="M10 3v10M5.5 8.5 10 13l4.5-4.5M4 16.5h12"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.5" y="8.6" width="11" height="8.2" rx="2"/><path d="M7 8.6V6.4a3 3 0 0 1 6 0v2.2"/></symbol>
+    <symbol id="i-chipset" viewBox="0 0 20 20"><rect x="3" y="3" width="14" height="14" rx="3"/><path d="M7 10h6M10 7v6"/></symbol>
+    <symbol id="g-claude" viewBox="0 0 20 20"><path d="M10 2.6v14.8M2.6 10h14.8M4.8 4.8l10.4 10.4M15.2 4.8 4.8 15.2"/></symbol>
+    <symbol id="g-codex" viewBox="0 0 20 20"><rect x="2.8" y="3.8" width="14.4" height="12.4" rx="2.6"/><path d="m6.2 8 2.4 2-2.4 2M10.6 12.2h3.2"/></symbol>
+    <symbol id="g-github" viewBox="0 0 20 20"><path d="M7.6 16.6c-3.4 1-3.4-1.7-4.8-2.1M12.4 18v-2.7a2.3 2.3 0 0 0-.7-1.8c2.3-.3 4.7-1.1 4.7-5a3.9 3.9 0 0 0-1.1-2.7 3.6 3.6 0 0 0-.1-2.7s-.9-.3-2.9 1.1a10 10 0 0 0-5.2 0C5.1 2.7 4.2 3 4.2 3a3.6 3.6 0 0 0-.1 2.7A3.9 3.9 0 0 0 3 8.5c0 3.9 2.4 4.7 4.7 5a2.3 2.3 0 0 0-.7 1.8V18"/></symbol>
+  </defs>
+</svg>
+
+<nav class="menubar" aria-label="Site">
+  <a class="app" href="#top"><img src="assets/icon.png" alt="">Token Meter</a>
+  <span class="nav">
+    <a href="#tour">Features</a>
+    <a href="#privacy">Privacy</a>
+    <a href="#install">Install</a>
+    <a href="#faq">FAQ</a>
+    <a href="https://github.com/avaakash/claude-api-pricing-visualizer">GitHub</a>
+  </span>
+  <span class="spacer"></span>
+  <span class="item status open" id="status" data-level="ok" aria-hidden="true">
+    <svg class="icon"><use href="#i-gauge"/></svg><span class="txt" id="status-text">5h 0% · W 47%</span>
+  </span>
+  <span class="item clock" id="clock" aria-hidden="true">Tue 9:00 AM</span>
+</nav>
+
+<main id="top">
+  <div class="hero">
+    <div class="wrap">
+      <div class="hero-top">
+        <h1>See the wall before you hit it.</h1>
+        <p class="lede">Token Meter keeps your Claude Code and Codex limits in the menu bar, warns you before you run out, and shows what all those tokens would have cost at API prices. It's the receipt you'll never get.</p>
+        <div class="actions">
+          <a class="btn-download" href="https://github.com/avaakash/claude-api-pricing-visualizer/releases/latest/download/TokenMeter.dmg">
+            <svg class="icon"><use href="#i-download"/></svg>
+            <span><b>Download for Mac</b><small>Free · universal · about 2 MB</small></span>
+          </a>
+          <a class="link-quiet" href="#install">Build it yourself</a>
+        </div>
+        <ul class="badges" aria-label="At a glance">
+          <li><svg class="icon"><use href="#i-chipset"/></svg>macOS 13+, Apple Silicon and Intel</li>
+          <li><svg class="icon"><use href="#i-lock"/></svg>Runs entirely on your Mac</li>
+          <li><svg class="icon"><use href="#i-check"/></svg>No account, no telemetry</li>
+        </ul>
+
+        <div class="menu" id="menu" role="img" aria-label="Token Meter's menu bar menu, showing Claude and Codex usage">
+          <div class="head">Claude</div>
+          <div class="row"><span>5-hour: <span class="pct" id="m-five">0% used</span><span id="m-five-reset"></span></span></div>
+          <div class="row"><span>Weekly: <span class="pct" id="m-week">47% used</span> · resets Mon 9:00 AM</span></div>
+          <div class="head">Codex</div>
+          <div class="row"><span>5-hour: <span class="pct">12% used</span> · resets 4:05 PM</span></div>
+          <div class="row"><span>Weekly: <span class="pct">34% used</span> · resets Fri 11:00 AM</span></div>
+          <hr>
+          <div class="row act"><span>Open Dashboard</span><kbd>⌘O</kbd></div>
+          <div class="row act"><span>Sync Now</span><kbd>⇧⌘R</kbd></div>
+          <div class="row act"><span><span class="check">✓</span>Open at Login</span></div>
+          <hr>
+          <div class="row act"><span>Quit Token Meter</span><kbd>⌘Q</kbd></div>
+        </div>
+        <p class="menu-note">The menu, as it sits in your menu bar.</p>
+      </div>
+
+      <div class="day" aria-labelledby="day-title">
+        <div class="day-head">
+          <h2 id="day-title">Drag through a Tuesday</h2>
+          <p>A made-up work day. Watch the menu bar.</p>
+        </div>
+        <div class="day-body">
+          <div class="timeline" id="timeline">
+            <div class="bands" id="bands"></div>
+            <div class="bars" id="bars"></div>
+            <div class="ticks" id="ticks"></div>
+            <input class="scrub" id="scrub" type="range" min="0" max="600" step="5" value="0" aria-label="Time of day" aria-valuetext="9:00 AM">
+            <div class="playhead" id="playhead" data-time="9:00 AM"></div>
+          </div>
+          <div class="readout">
+            <div>
+              <div class="meter-k"><span>5-hour window</span><b id="r-five">0%<small>used</small></b></div>
+              <div class="meter" id="meter-five"><div class="fill" id="fill-five"></div><div class="cuts"><span></span><span></span><span></span><span></span><span></span></div></div>
+            </div>
+            <div>
+              <div class="meter-k"><span>Weekly limit</span><b id="r-week">47%<small>used</small></b></div>
+              <div class="meter" id="meter-week"><div class="fill" id="fill-week"></div><div class="cuts"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+            </div>
+            <div class="cost-now"><b id="r-cost">$0.00</b><span>so far today, at API rates</span></div>
+          </div>
+        </div>
+        <div class="day-note" id="note" data-level="ok" aria-live="polite"><svg class="icon"><use href="#i-info"/></svg><span id="note-text">9:00 AM. Coffee first. Nothing used yet.</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="tour" aria-labelledby="tour-title">
+    <div class="wrap">
+      <h2 class="sec-title" id="tour-title">Click the menu bar item. The rest is right there.</h2>
+      <p class="sec-lede">The dashboard answers the same two questions in more depth: how much room is left, and what the work cost. Pick a view, or click the sidebar in the window itself.</p>
+      <div class="tour">
+        <div class="views" role="tablist" aria-label="Dashboard views" id="views">
+          <div class="group">Summary</div>
+          <button role="tab" aria-selected="true" data-view="overview"><svg class="icon"><use href="#i-overview"/></svg><b>Overview</b><p>Both questions on one screen: how much of each limit is left, and what the period cost.</p></button>
+          <button role="tab" aria-selected="false" data-view="limits"><svg class="icon"><use href="#i-gauge"/></svg><b>Limits</b><p>Live 5-hour and weekly windows for Claude and Codex, what each window cost, and where the week is headed.</p></button>
+          <button role="tab" aria-selected="false" data-view="cost"><svg class="icon"><use href="#i-cost"/></svg><b>Cost</b><p>Any period from a day to a year, split by Claude and Codex, by model and by token type.</p></button>
+          <div class="group">Breakdown</div>
+          <button role="tab" aria-selected="false" data-view="sessions"><svg class="icon"><use href="#i-sessions"/></svg><b>Sessions</b><p>Every session under its real name, searchable by name, project, path or ID.</p></button>
+          <button role="tab" aria-selected="false" data-view="session"><svg class="icon"><use href="#i-turns"/></svg><b>One session</b><p>Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.</p></button>
+          <button role="tab" aria-selected="false" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg><b>Projects</b><p>Where the spend goes, repo by repo.</p></button>
+          <button role="tab" aria-selected="false" data-view="models"><svg class="icon"><use href="#i-chip"/></svg><b>Models</b><p>Which models you lean on, and what each one costs.</p></button>
+        </div>
+        <div role="tabpanel" aria-label="Dashboard screenshot">
+          <p class="shot-desc" id="shot-desc"></p>
+          <div class="window">
+            <div class="titlebar"><i></i><i></i><i></i><span>Token Meter</span></div>
+            <div class="shot" id="shot">
+              <picture>
+                <source id="shot-dark" media="(prefers-color-scheme: dark)" srcset="assets/screenshots/overview-dark.png">
+                <img id="shot-img" src="assets/screenshots/overview-light.png" width="1280" height="820" alt="The Overview: Claude and Codex limits, the API-equivalent cost split by source and model, and recent sessions">
+              </picture>
+              <button class="hit" style="top:11.9%" data-view="overview" tabindex="-1" aria-label="Overview"></button>
+              <button class="hit" style="top:16.1%" data-view="limits" tabindex="-1" aria-label="Limits"></button>
+              <button class="hit" style="top:20.2%" data-view="cost" tabindex="-1" aria-label="Cost"></button>
+              <button class="hit" style="top:28.5%" data-view="sessions" tabindex="-1" aria-label="Sessions"></button>
+              <button class="hit" style="top:32.6%" data-view="projects" tabindex="-1" aria-label="Projects"></button>
+              <button class="hit" style="top:36.7%" data-view="models" tabindex="-1" aria-label="Models"></button>
+            </div>
+          </div>
+          <p class="shot-caption">Light and Dark follow your Mac. Screenshots use made-up data.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="privacy" aria-labelledby="privacy-title">
+    <div class="wrap">
+      <h2 class="sec-title" id="privacy-title">Your logs never leave your Mac.</h2>
+      <p class="sec-lede">Claude Code and Codex already write a log of every session to your disk. Token Meter reads those files, prices them, and keeps the results in a local database.</p>
+      <div class="flow">
+        <div class="node">
+          <h3>Logs already on your Mac</h3>
+          <code>~/.claude/projects/</code>
+          <code>~/.codex/sessions/</code>
+          <p>Only new lines are read on each sync, so years of history stay fast.</p>
+        </div>
+        <div class="arrow" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></div>
+        <div class="node">
+          <h3>A local database</h3>
+          <code>~/Library/Application Support/TokenMeter/</code>
+          <p>Every turn priced at published API rates, cache reads and writes included.</p>
+        </div>
+        <div class="arrow" aria-hidden="true"><svg class="icon"><use href="#i-arrow"/></svg></div>
+        <div class="node">
+          <h3>Your menu bar</h3>
+          <code>5h 41% · W 63%</code>
+          <p>Plus the dashboard window, served from inside the app. No port is opened.</p>
+        </div>
+      </div>
+      <ul class="promises">
+        <li><h3>The limits are the real ones.</h3><p>The percentages come from the providers. Claude's are read with the login Claude Code already keeps in your Keychain, and Codex's from <code>codex app-server</code>. Both refresh every 10 minutes, or when you click Sync Now. These two checks are the only network calls the app makes.</p></li>
+        <li><h3>Forecasts come from your own weeks.</h3><p>"On pace to finish the week near 78%" is projected from the shape of your past weeks, with a range, not a straight line from Monday. Estimates are always labeled as estimates.</p></li>
+        <li><h3>The dollars are hypothetical.</h3><p>On a Claude Pro or Max plan, or ChatGPT Plus or Pro, nobody bills you per token. Token Meter shows what the same tokens would cost on the API, which is either reassuring or alarming.</p></li>
+        <li><h3>Small and native.</h3><p>A universal Swift app of about 2 MB. No account, no analytics, no Electron, no background server.</p></li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="install" aria-labelledby="install-title">
+    <div class="wrap">
+      <h2 class="sec-title" id="install-title">Installed in under a minute.</h2>
+      <div class="install">
+        <div>
+          <ol class="steps">
+            <li><h3>Download the app</h3><p>Get <a href="https://github.com/avaakash/claude-api-pricing-visualizer/releases/latest/download/TokenMeter.dmg"><code>TokenMeter.dmg</code></a> from the latest GitHub release.</p></li>
+            <li><h3>Drag it to Applications</h3><p>Open the disk image and drag Token Meter onto the Applications folder.</p></li>
+            <li><h3>Open it once, the long way</h3><p>Token Meter isn't notarized by Apple yet, so the first launch shows a warning. Click <b>Done</b>, then go to <span class="path">System Settings → Privacy &amp; Security</span>, scroll down and click <b>Open Anyway</b>.</p></li>
+            <li><h3>Look up</h3><p>The gauge appears in your menu bar. If macOS asks whether <code>security</code> may use “Claude Code-credentials”, choose <b>Always Allow</b>: that's how it reads your Claude limits.</p></li>
+          </ol>
+          <div class="callout"><b>Coming from the old Python dashboard?</b> Build with <code>--import-db legacy-python/usage.sqlite3</code> to keep your limit history.</div>
+        </div>
+        <div class="source-panel">
+          <h3>Or build it yourself</h3>
+          <p>All you need is the Xcode Command Line Tools. No Xcode, no Apple Developer account, and no Gatekeeper warning for an app you built.</p>
+          <pre class="code" id="build-cmd"><button class="copy" data-copy="build-cmd" type="button">Copy</button><span class="prompt">$ </span>xcode-select --install
+<span class="prompt">$ </span>git clone https://github.com/avaakash/claude-api-pricing-visualizer.git
+<span class="prompt">$ </span>cd claude-api-pricing-visualizer
+<span class="prompt">$ </span>./build.sh --install</pre>
+          <ul class="reqs">
+            <li>macOS 13 Ventura or later</li>
+            <li>Apple Silicon or Intel (one universal app)</li>
+            <li>Claude Code, Codex, or both, used on this Mac</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <h2 class="sec-title" id="faq-title">Questions</h2>
+      <div class="faq">
+        <details><summary>Am I being charged these amounts?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>No. On a subscription the dollar figures are what the same tokens would cost on the pay-per-token API. They're there for perspective, not billing.</p></details>
+        <details><summary>Does anything leave my Mac?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Only the two limit checks, which go to Anthropic and to OpenAI (through the <code>codex</code> CLI) using the logins you already have. Your logs, prompts and costs stay on your machine.</p></details>
+        <details><summary>Why does it ask for my Keychain?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Claude's live limit percentage is read with the token Claude Code stored there when you logged in. Deny it and everything else still works; the Claude limit cards fall back to estimates.</p></details>
+        <details><summary>Do I need both Claude Code and Codex?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>No. Token Meter shows whichever you use, and you can switch between Claude, Codex or both in the sidebar.</p></details>
+        <details><summary>Why isn't it on the Mac App Store?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>The App Store sandbox would block reading <code>~/.claude</code>, the Keychain item and the <code>codex</code> binary, which is the whole app.</p></details>
+        <details><summary>The prices look wrong.<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Pricing lives in two JSON files in the repository. Edit them and rebuild, and old messages are repriced on the next launch. Pull requests with updated prices are welcome.</p></details>
+        <details><summary>How do I uninstall it?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Quit it from the menu bar, then delete Token Meter from Applications and the folder <code>~/Library/Application Support/TokenMeter</code>.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <div class="close">
+    <div class="wrap">
+      <img src="assets/icon.png" alt="" width="112" height="112">
+      <h2>Know your headroom. Keep your flow.</h2>
+      <div class="actions">
+        <a class="btn-download" href="https://github.com/avaakash/claude-api-pricing-visualizer/releases/latest/download/TokenMeter.dmg">
+          <svg class="icon"><use href="#i-download"/></svg>
+          <span><b>Download for Mac</b><small>Free · universal · about 2 MB</small></span>
+        </a>
+        <a class="link-quiet" href="https://github.com/avaakash/claude-api-pricing-visualizer">Source on GitHub</a>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Not affiliated with Anthropic or OpenAI. Claude and Codex are trademarks of their owners.</span>
+    <span><a href="https://github.com/avaakash/claude-api-pricing-visualizer/releases">Releases</a> · <a href="https://github.com/avaakash/claude-api-pricing-visualizer/issues">Report an issue</a></span>
+  </div>
+</footer>
+
+<script>
+(() => {
+  // The simulated day: minutes after 9:00 AM, dollars per minute at API rates.
+  const DAY = 600, START_HOUR = 9;
+  const bursts = [[20, 95, 0.07], [95, 170, 0.11], [225, 295, 0.11], [300, 355, 0.012], [360, 470, 0.09], [470, 595, 0.12]];
+  const rate = m => {
+    for (const [a, b, level] of bursts) if (m >= a && m < b) return level * (0.6 + 0.4 * Math.abs(Math.sin(m * 0.37) * Math.cos(m * 0.053)));
+    return 0;
+  };
+  const perMinute = Array.from({ length: DAY }, (_, m) => rate(m));
+  const cumulative = [0];
+  for (const v of perMinute) cumulative.push(cumulative[cumulative.length - 1] + v);
+  const costBetween = (a, b) => cumulative[Math.max(0, Math.min(DAY, b))] - cumulative[Math.max(0, Math.min(DAY, a))];
+
+  // Like Claude's, a 5-hour window opens with the first message after the last one closed.
+  const windows = [];
+  for (let m = 0; m < DAY; m++) {
+    const open = windows[windows.length - 1];
+    if (perMinute[m] > 0 && (!open || m >= open.end)) windows.push({ start: m, end: m + 300 });
+  }
+  const fiveCap = costBetween(windows[windows.length - 1].start, DAY) / 0.93;
+  const weekBase = 47, weekCap = cumulative[DAY] / 0.3;
+
+  const clock = m => {
+    const h = START_HOUR + Math.floor(m / 60), min = m % 60;
+    return `${((h + 11) % 12) + 1}:${String(min).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+  };
+  const levelOf = pct => pct >= 90 ? "crit" : pct >= 75 ? "warn" : "ok";
+  const $ = id => document.getElementById(id);
+
+  const bars = $("bars"), BUCKET = 10;
+  for (let b = 0; b < DAY / BUCKET; b++) bars.appendChild(document.createElement("i"));
+  const bucketCosts = [...bars.children].map((_, b) => costBetween(b * BUCKET, (b + 1) * BUCKET));
+  const peak = Math.max(...bucketCosts);
+  [...bars.children].forEach((el, b) => { el.style.height = `${Math.max(2, (bucketCosts[b] / peak) * 100)}%`; });
+  $("ticks").innerHTML = Array.from({ length: 11 }, (_, i) => `<span style="left:${(i / 10) * 100}%">${((START_HOUR + i + 11) % 12) + 1}${START_HOUR + i >= 12 ? "pm" : "am"}</span>`).join("");
+  $("bands").innerHTML = windows.map(w => {
+    const left = (w.start / DAY) * 100, width = (Math.min(w.end, DAY) - w.start) / DAY * 100;
+    return `<div class="band" style="left:${left}%;width:calc(${width}% - 4px)"><span class="band-k">5-hour window ·&nbsp;</span>resets ${clock(w.end)}</div>`;
+  }).join("");
+
+  function render(m) {
+    const w = windows.findLast(x => x.start <= m && m < x.end);
+    const five = w ? Math.round((costBetween(w.start, m) / fiveCap) * 100) : 0;
+    const week = Math.round(weekBase + (cumulative[m] / weekCap) * 100);
+    const highest = Math.max(five, week), level = levelOf(highest);
+
+    $("status").dataset.level = level;
+    $("status-text").textContent = `5h ${five}% · W ${week}%`;
+    $("clock").textContent = `Tue ${clock(m)}`;
+    $("m-five").textContent = w ? `${five}% used` : "0% used";
+    $("m-five-reset").textContent = w ? ` · resets ${clock(w.end)}` : "";
+    $("m-week").textContent = `${week}% used`;
+
+    $("r-five").firstChild.textContent = `${five}%`;
+    $("r-week").firstChild.textContent = `${week}%`;
+    $("fill-five").style.width = `${Math.min(100, five)}%`;
+    $("fill-week").style.width = `${Math.min(100, week)}%`;
+    $("meter-five").dataset.level = levelOf(five);
+    $("meter-week").dataset.level = levelOf(week);
+    $("r-cost").textContent = `$${cumulative[m].toFixed(2)}`;
+
+    [...bars.children].forEach((el, b) => el.classList.toggle("past", (b + 1) * BUCKET <= m));
+    const playhead = $("playhead");
+    playhead.style.left = `${(m / DAY) * 100}%`;
+    playhead.dataset.time = clock(m);
+    playhead.dataset.edge = m < 30 ? "start" : m > DAY - 30 ? "end" : "";
+    $("scrub").setAttribute("aria-valuetext", `${clock(m)}: 5-hour ${five}%, weekly ${week}%`);
+
+    const justReset = windows.find((x, i) => i > 0 && windows[i - 1].end <= m && m - windows[i - 1].end < 40);
+    let text;
+    if (m < windows[0].start) text = `${clock(m)}. Coffee first. Nothing used yet.`;
+    else if (five >= 90) text = `Red at 90%. The wall is close: ${100 - five}% of this window left until ${clock(w.end)}.`;
+    else if (five >= 75) text = `Orange at 75%. Time to wrap up the big refactor before ${clock(w.end)}.`;
+    else if (!w || justReset) text = `The window reset at ${clock(windows[1].start)}. A fresh five hours.`;
+    else if (perMinute[m] === 0) text = `Lunch. The meter waits.`;
+    else text = `Plenty of room. This window resets at ${clock(w.end)}.`;
+    const note = $("note");
+    note.dataset.level = five >= 90 ? "crit" : five >= 75 ? "warn" : "ok";
+    note.querySelector("use").setAttribute("href", five >= 75 ? "#i-alert" : "#i-info");
+    $("note-text").textContent = text;
+  }
+
+  const scrub = $("scrub");
+  let playing = null;
+  scrub.addEventListener("input", () => { if (playing) cancelAnimationFrame(playing), playing = null; render(+scrub.value); });
+
+  // One authored moment: the morning plays once, stopping in the amber zone.
+  const target = 300;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    scrub.value = target; render(target);
+  } else {
+    render(0);
+    const t0 = performance.now() + 500, length = 3200;
+    const ease = t => 1 - Math.pow(1 - t, 3);
+    const step = now => {
+      const t = Math.min(1, Math.max(0, (now - t0) / length));
+      const m = Math.round(ease(t) * target);
+      scrub.value = m; render(m);
+      playing = t < 1 ? requestAnimationFrame(step) : null;
+    };
+    playing = requestAnimationFrame(step);
+  }
+
+  // Hang the menu under the status item, wherever the menu bar puts it.
+  const menu = $("menu"), menuNote = document.querySelector(".menu-note"), heroTop = document.querySelector(".hero-top");
+  const narrow = matchMedia("(max-width: 960px)");
+  function placeMenu() {
+    for (const el of [menu, menuNote]) { el.style.left = ""; el.style.right = ""; el.style.top = ""; }
+    if (narrow.matches) return;
+    const box = heroTop.getBoundingClientRect(), item = $("status").getBoundingClientRect();
+    const width = menu.offsetWidth;
+    const left = Math.min(item.left, document.documentElement.clientWidth - width - 16) - box.left;
+    const top = document.querySelector(".menubar").getBoundingClientRect().bottom + 4 - box.top;
+    menu.style.left = `${left}px`; menu.style.right = "auto"; menu.style.top = `${top}px`;
+    menuNote.style.left = `${left}px`; menuNote.style.right = "auto"; menuNote.style.top = `${top + menu.offsetHeight + 10}px`;
+  }
+  placeMenu();
+  addEventListener("resize", placeMenu);
+
+  // Tour
+  const views = {
+    overview: "Both questions on one screen: how much of each limit is left, and what the period cost.",
+    limits: "Live 5-hour and weekly windows for Claude and Codex, what each window cost, and where the week is headed.",
+    cost: "Any period from a day to a year, split by Claude and Codex, by model and by token type.",
+    sessions: "Every session under its real name, searchable by name, project, path or ID.",
+    session: "Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.",
+    projects: "Where the spend goes, repo by repo.",
+    models: "Which models you lean on, and what each one costs.",
+  };
+  const alts = {
+    overview: "The Overview: Claude and Codex limits, the API-equivalent cost split by source and model, and recent sessions",
+    limits: "The Limits view: 5-hour and weekly windows for Claude and Codex with usage charts and a weekly forecast",
+    cost: "The Cost view: total cost for the period, the Claude and Codex split, and cost per day",
+    sessions: "The Sessions list: session names, source, last active time, messages, tokens and cost",
+    session: "One session: total cost, turns, a cost-per-turn chart and each turn's prompt and tools",
+    projects: "The Projects view: cost by project",
+    models: "The Models view: cost by model",
+  };
+  for (const v of Object.keys(views)) new Image().src = `assets/screenshots/${v}-light.png`;
+  const shot = $("shot");
+  function show(view) {
+    document.querySelectorAll("#views [role=tab]").forEach(b => b.setAttribute("aria-selected", b.dataset.view === view));
+    shot.classList.add("swapping");
+    const img = $("shot-img");
+    img.onload = () => shot.classList.remove("swapping");
+    $("shot-dark").srcset = `assets/screenshots/${view}-dark.png`;
+    img.src = `assets/screenshots/${view}-light.png`;
+    img.alt = alts[view];
+    $("shot-desc").textContent = views[view];
+  }
+  $("shot-desc").textContent = views.overview;
+  document.addEventListener("click", e => {
+    const target = e.target.closest("[data-view]");
+    if (target) show(target.dataset.view);
+    const copy = e.target.closest("[data-copy]");
+    if (copy) {
+      const text = [...$(copy.dataset.copy).childNodes].filter(n => n !== copy).map(n => n.textContent).join("").replace(/^\$ /gm, "");
+      navigator.clipboard?.writeText(text).then(() => {
+        copy.textContent = "Copied";
+        setTimeout(() => { copy.textContent = "Copy"; }, 1600);
+      });
+    }
+  });
+  $("views").addEventListener("keydown", e => {
+    if (!["ArrowDown", "ArrowUp", "ArrowLeft", "ArrowRight"].includes(e.key)) return;
+    const tabs = [...document.querySelectorAll("#views [role=tab]")];
+    const i = tabs.findIndex(t => t.getAttribute("aria-selected") === "true");
+    const next = tabs[(i + (e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
+    next.focus(); show(next.dataset.view); e.preventDefault();
+  });
+})();
+</script>
+</body>
+</html>

@@ -30,6 +30,9 @@ LOG_GLOBS = [
     os.path.join(HOME, ".codex", "archived_sessions", "*.jsonl"),
 ]
 PRICING_PATH = os.path.join(server.APP_DIR, "pricing_codex.json")
+# Thread names live here, not in the session logs; a later line for the
+# same id (a rename) supersedes an earlier one.
+SESSION_INDEX_PATH = os.path.join(HOME, ".codex", "session_index.jsonl")
 
 # ---------------------------------------------------------------------------
 # Pricing ($ per 1,000,000 tokens), loaded from pricing_codex.json. Unlike
@@ -313,6 +316,27 @@ def scan_file(conn, path, state):
          "carry_session_id": session_id, "carry_cwd": current_cwd},
         renamed_from,
     )
+
+
+def sync_session_titles(conn):
+    names = {}
+    try:
+        with open(SESSION_INDEX_PATH, encoding="utf-8", errors="replace") as f:
+            for line in f:
+                try:
+                    entry = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                if not isinstance(entry, dict):
+                    continue
+                session_id, name = entry.get("id"), entry.get("thread_name")
+                if isinstance(session_id, str) and isinstance(name, str) and name.strip():
+                    stamp = entry.get("updated_at") or ""
+                    if session_id not in names or stamp >= names[session_id][1]:
+                        names[session_id] = (name.strip(), stamp)
+    except OSError:
+        return
+    server.store_app_titles(conn, [(sid, name, "codex") for sid, (name, _) in names.items()])
 
 
 def _persist_rename(conn, path, mtime, size, info, renamed_from):

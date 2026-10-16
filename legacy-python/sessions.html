@@ -246,8 +246,20 @@ let allSessions = [];
 let sortKey = "end_ts";
 let sortDir = -1; // -1 desc, 1 asc
 
+// A recorded or app-given title; else the session's first prompt, quoted;
+// else an untitled label that still says which project and when.
+function sessionDisplayName(r) {
+  if (r.title) return r.title;
+  if (r.first_prompt) {
+    const p = r.first_prompt.length > 80 ? r.first_prompt.slice(0, 78).trimEnd() + "…" : r.first_prompt;
+    return "“" + p + "”";
+  }
+  const when = r.start_ts ? new Date(r.start_ts).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
+  return ["Untitled", r.project || "unknown", when].filter(Boolean).join(" · ");
+}
+
 function displayTitleFor(r) {
-  return r.title || r.project || "unknown";
+  return sessionDisplayName(r);
 }
 
 function computeRowFields(r) {

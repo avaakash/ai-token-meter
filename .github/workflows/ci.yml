@@ -1,0 +1,16 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run checks
+        run: swift run --package-path macpapp usage-core-checks
+      - name: Build universal app
+        run: ./build.sh

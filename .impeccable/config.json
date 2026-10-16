@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "docs/index.html"
+        ],
+        "createdAt": "2026-10-16T13:42:16.526Z",
+        "reason": "agent decided: the 3 hits are the menu bar item (24px native height, text vertically centred like macOS), the screenshot window (image is meant to sit flush in its frame), and the FAQ list (hairline above summaries that carry 18px padding); verified in desktop/mobile captures"
+      }
+    ]
+  }
+}

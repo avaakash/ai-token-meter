@@ -4,6 +4,7 @@ windows. Everything here is specific to how Claude Code's local transcripts
 see server.py for the source-agnostic plumbing that calls into this module.
 """
 
+import glob
 import hashlib
 import json
 import os
@@ -22,6 +23,12 @@ SOURCE_NAME = "claude"
 
 HOME = os.path.expanduser("~")
 LOG_GLOBS = [os.path.join(HOME, ".claude", "projects", "**", "*.jsonl")]
+# The Claude desktop app keeps its own per-session metadata, including names
+# it generated and renames made while the CLI wasn't running — neither of
+# which is ever written into the transcript.
+APP_SESSIONS_GLOB = os.path.join(
+    HOME, "Library", "Application Support", "Claude", "claude-code-sessions", "**", "*.json"
+)
 PRICING_PATH = os.path.join(server.APP_DIR, "pricing_claude.json")
 
 # ---------------------------------------------------------------------------
@@ -121,6 +128,86 @@ def token_fields_from_row(row):
 # ---------------------------------------------------------------------------
 
 
+def _between(text, start, end):
+    i = text.find(start)
+    if i == -1:
+        return ""
+    j = text.find(end, i + len(start))
+    return text[i + len(start):j if j != -1 else None].strip()
+
+
+def first_prompt_text(obj):
+    """The person's own words in a `user` record, or None for tool results,
+    injected context (skill bodies, caveats, reminders) and bare slash
+    commands. A slash command with arguments reads as typed: "/work-issue 5364"."""
+    if obj.get("type") != "user" or obj.get("isMeta") or obj.get("isSidechain"):
+        return None
+    content = (obj.get("message") or {}).get("content")
+    if isinstance(content, list):
+        content = next((c.get("text") for c in content
+                        if isinstance(c, dict) and c.get("type") == "text" and c.get("text")), None)
+    if not isinstance(content, str):
+        return None
+    text = content.strip()
+    if "<command-name>" in text:
+        name, args = _between(text, "<command-name>", "</command-name>"), _between(text, "<command-args>", "</command-args>")
+        if not name or not args:
+            return None
+        text = f"{name} {args}"
+    elif text.startswith("<") or text.startswith("Caveat:"):
+        return None
+    text = " ".join(text.split())
+    if text.startswith("/") and " " not in text:
+        return None  # a bare slash command, typed without the <command-name> wrapper
+    return text[:200] or None
+
+
+def _first_prompt_in(path):
+    """(session_id, text) for the file's first prompt, reading only as far
+    as needed."""
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                if '"type":"user"' not in line:
+                    continue
+                try:
+                    obj = json.loads(line)
+                except (json.JSONDecodeError, ValueError):
+                    continue
+                text = first_prompt_text(obj)
+                if text and obj.get("sessionId"):
+                    return obj["sessionId"], text
+    except OSError:
+        pass
+    return None
+
+
+def backfill_first_prompts(conn):
+    rows = []
+    for pattern in LOG_GLOBS:
+        for path in glob.glob(pattern, recursive=True):
+            found = _first_prompt_in(path)
+            if found:
+                rows.append(found)
+    server.store_first_prompts(conn, rows)
+
+
+def sync_session_titles(conn):
+    rows = []
+    for path in glob.glob(APP_SESSIONS_GLOB, recursive=True):
+        try:
+            with open(path, encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if not isinstance(meta, dict):
+            continue
+        session_id, title = meta.get("cliSessionId"), meta.get("title")
+        if isinstance(session_id, str) and isinstance(title, str) and title.strip():
+            rows.append((session_id, title.strip(), meta.get("titleSource") or "auto"))
+    server.store_app_titles(conn, rows)
+
+
 def scan_file(conn, path, state):
     try:
         stat = os.stat(path)
@@ -140,6 +227,8 @@ def scan_file(conn, path, state):
     new_rows = []
     ai_title_rows = []
     custom_title_rows = []
+    first_prompt = None
+    want_prompt = offset == 0  # a resumed scan has already passed the start
     new_offset = offset
     try:
         with open(path, "r", encoding="utf-8", errors="replace") as f:
@@ -175,6 +264,13 @@ def scan_file(conn, path, state):
                     custom_session_id = obj.get("sessionId")
                     if custom_title and custom_session_id:
                         custom_title_rows.append((custom_session_id, custom_title))
+                    continue
+
+                if want_prompt and obj.get("type") == "user":
+                    text = first_prompt_text(obj)
+                    if text and obj.get("sessionId"):
+                        first_prompt = (obj["sessionId"], text)
+                        want_prompt = False
                     continue
 
                 if obj.get("type") != "assistant":
@@ -279,6 +375,9 @@ def scan_file(conn, path, state):
             """,
             custom_title_rows,
         )
+
+    if first_prompt:
+        server.store_first_prompts(conn, [first_prompt])
 
     conn.execute(
         "INSERT OR REPLACE INTO file_state (path, mtime, size, offset) VALUES (?, ?, ?, ?)",
