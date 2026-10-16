@@ -335,6 +335,48 @@
   .table-wrap { overflow-x: auto; }
   .more-row { display: flex; justify-content: center; padding: 12px; border-top: 1px solid var(--hair); }
 
+  /* ---------- Settings ---------- */
+  .settings-note { margin: 0; font-size: 12.5px; color: var(--ink-2); max-width: 70ch; }
+  table.data.prices tbody tr { cursor: default; }
+  table.data.prices tbody tr:hover td { background: none; }
+  table.data.prices td { padding-top: 8px; padding-bottom: 8px; }
+  table.data.prices .s-name { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+  .tag { font-size: 11px; font-weight: 600; color: var(--plan-ink); background: var(--plan-wash); border-radius: 5px; padding: 1px 6px; }
+  .money {
+    display: inline-flex; align-items: center; gap: 2px; height: 28px; padding: 0 8px; border-radius: 7px;
+    background: var(--panel); box-shadow: 0 0 0 1px var(--hair-strong); color: var(--ink-3); font-size: 12.5px;
+  }
+  .money:focus-within { box-shadow: 0 0 0 2px var(--plan); }
+  .money input {
+    width: 64px; border: 0; outline: 0; background: transparent; font: inherit; color: var(--ink);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  .money input::placeholder { color: var(--ink-3); }
+  .money.wide input { width: 84px; }
+  .money.name input { width: 220px; text-align: left; }
+  .money.invalid { box-shadow: 0 0 0 2px var(--crit); }
+  .add-price { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 18px; border-top: 1px solid var(--hair); }
+  .add-price .lbl { font-size: 12px; color: var(--ink-3); }
+  .panel-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 18px; border-top: 1px solid var(--hair); }
+  .btn {
+    border: 0; border-radius: 7px; padding: 6px 10px; cursor: pointer; background: var(--panel);
+    font-size: 12px; font-weight: 600; color: var(--ink); box-shadow: 0 0 0 1px var(--hair-strong);
+  }
+  .btn:hover { box-shadow: 0 0 0 1px var(--ink-3); }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .btn.confirm { color: var(--crit-ink); box-shadow: 0 0 0 1px var(--crit); }
+  .budget-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .budget-src { padding: 14px 18px; }
+  .budget-src + .budget-src { border-top: 1px solid var(--hair); }
+  .budget-src .source-head { padding: 0 0 10px; }
+  .budget-field { display: flex; flex-direction: column; gap: 5px; }
+  .budget-field .k { font-size: 12px; font-weight: 600; color: var(--ink-2); }
+  .budget-field .money { align-self: flex-start; }
+  .budget-field .spent { font-size: 11.5px; color: var(--ink-3); }
+  .save-state { font-size: 12px; color: var(--ink-3); }
+  .save-state.err { color: var(--crit-ink); }
+  .nav-sep { height: 1px; background: var(--hair); margin: 10px 10px 6px; }
+
   .sessions-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
   .back-link { border: 0; background: none; padding: 0; margin: 0 0 8px; cursor: pointer; color: var(--plan-ink); font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
   .back-link .icon { width: 14px; height: 14px; }
@@ -453,7 +495,7 @@
     .nav { order: 3; flex-direction: row; overflow-x: auto; width: 100%; gap: 4px; margin: 0 -4px; padding: 0 4px 2px; scrollbar-width: none; }
     .nav::-webkit-scrollbar { display: none; }
     .nav a { flex: none; padding: 6px 10px; }
-    .nav .count, .nav-alert, .nav-group { display: none; }
+    .nav .count, .nav-alert, .nav-group, .nav-sep { display: none; }
     .side-foot { order: 2; margin: 0 0 0 auto; flex-direction: row; align-items: center; gap: 8px; padding: 0; }
     .side-foot .side-label, .side-foot .theme-block, .side-foot .sample-block, .sync-line { display: none; }
     .sync { padding: 0; background: none; }
@@ -468,6 +510,7 @@
     .cost-figure .big { font-size: 30px; }
     .share-row { grid-template-columns: minmax(0, 1fr) 80px; }
     .share-row .share-bar-cell { grid-column: 1 / -1; order: 3; }
+    .budget-grid { grid-template-columns: minmax(0, 1fr); }
     .hide-sm { display: none; }
   }
   .no-motion *, .no-motion *::before, .no-motion *::after { transition: none !important; animation: none !important; }
@@ -543,6 +586,7 @@
     <symbol id="i-activity" viewBox="0 0 20 20"><rect x="3" y="4" width="14" height="13" rx="2.2"/><path d="M3 8h14M7 2.6V5.4M13 2.6V5.4"/><path d="M6.5 11h1M9.5 11h1M12.5 11h1M6.5 14h1M9.5 14h1"/></symbol>
     <symbol id="i-sessions" viewBox="0 0 20 20"><path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/><circle cx="4" cy="5.5" r="0.9"/><circle cx="4" cy="10" r="0.9"/><circle cx="4" cy="14.5" r="0.9"/></symbol>
     <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.8 6.2a1.8 1.8 0 0 1 1.8-1.8h3.2l1.8 1.9h5.8a1.8 1.8 0 0 1 1.8 1.8v6.7a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8z"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 20 20"><path d="M3 6h7.5M14.5 6H17M3 14h2.5M9.5 14H17"/><circle cx="12.5" cy="6" r="2"/><circle cx="7.5" cy="14" r="2"/></symbol>
     <symbol id="i-chip" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8"/><rect x="8.3" y="8.3" width="3.4" height="3.4" rx="0.6"/><path d="M8 2.8v2.7M12 2.8v2.7M8 14.5v2.7M12 14.5v2.7M2.8 8h2.7M2.8 12h2.7M14.5 8h2.7M14.5 12h2.7"/></symbol>
     <symbol id="i-sync" viewBox="0 0 20 20"><path d="M16 8.2A6.3 6.3 0 0 0 4.6 6.4M4 11.8a6.3 6.3 0 0 0 11.4 1.8"/><path d="M4.4 3.6v3h3M15.6 16.4v-3h-3"/></symbol>
     <symbol id="i-search" viewBox="0 0 20 20"><circle cx="8.8" cy="8.8" r="5.3"/><path d="m12.8 12.8 3.9 3.9"/></symbol>
@@ -578,6 +622,8 @@
       <a href="#sessions" data-view="sessions"><svg class="icon"><use href="#i-sessions"/></svg>Sessions<span class="count" id="nav-session-count"></span></a>
       <a href="#projects" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg>Projects</a>
       <a href="#models" data-view="models"><svg class="icon"><use href="#i-chip"/></svg>Models</a>
+      <div class="nav-sep"></div>
+      <a href="#settings" data-view="settings"><svg class="icon"><use href="#i-settings"/></svg>Settings</a>
     </nav>
 
     <div class="side-foot">
@@ -601,6 +647,7 @@
     <section class="view" id="view-transcript" data-view="transcript" hidden></section>
     <section class="view" id="view-projects" data-view="projects" hidden></section>
     <section class="view" id="view-models" data-view="models" hidden></section>
+    <section class="view" id="view-settings" data-view="settings" hidden></section>
   </main>
 </div>
 <div class="tip" id="tip" role="tooltip"></div>
@@ -689,6 +736,7 @@ const state = {
   query: "", sort: { key: "end_ts", dir: -1 }, selected: null, limit: 40,
   data: null, sessions: null, error: null, loading: false,
   transcriptId: null, transcript: null, turnSort: "order", expanded: new Set(), showCarried: false,
+  settings: null, settingsSource: "claude", settingsError: null, saveState: "", showAllPrices: false,
 };
 if (!["all", "claude", "codex"].includes(state.source)) state.source = "all";
 if (!PERIODS.some(p => p[0] === state.period)) state.period = "7d";
@@ -742,6 +790,7 @@ function adaptLimits(l) {
     status: l.status, error: l.error, synced_at: ms(l.synced_at), five_hour: five, weekly,
     forecast: weekly ? adaptForecast(l.forecast) : null, history,
     credit: { five_hour: five?.credit, weekly: weekly?.credit },
+    budgets: (l.budgets || []).map(b => ({ ...b, start: ms(b.start), end: ms(b.end) })),
   };
 }
 
@@ -770,6 +819,7 @@ async function refresh() {
     if (state.view === "sessions" || state.sessions) {
       state.sessions = (await api(`/api/all-sessions?source=${state.source}`)).sessions.map(normSession);
     }
+    if (state.view === "settings") state.settings = await api(`/api/app/settings?source=${state.settingsSource}`);
     state.error = null;
     retries = 0;
   } catch (e) {
@@ -928,6 +978,43 @@ function meterHTML(name, w, kind, src) {
     </div>`;
 }
 
+const BUDGET_LABEL = { day: "Daily budget", week: "Weekly budget", month: "Monthly budget" };
+
+/* A spending limit the person set: the same meter as a plan limit, in
+   dollars, over the current calendar day, week or month. */
+function budgetMeterHTML(b) {
+  const now = Date.now(), lvl = level(b.pct), name = BUDGET_LABEL[b.period];
+  const elapsed = Math.min(1, Math.max(0, (now - b.start) / (b.end - b.start)));
+  const badge = lvl === "crit" ? `<span class="lvl crit">${icon("alert")}Almost out</span>`
+              : lvl === "warn" ? `<span class="lvl warn">${icon("alert")}High</span>` : "";
+  const resets = b.end - now > 6 * DAY ? shortDate(b.end) : resetLabel(b.end);
+  const tipHTML = tipAttr(tipRows(name, [["Spent", usd(b.cost)], ["Budget", usd(b.limit)], ["Used", pct(b.pct)], ["Time elapsed", pct(elapsed * 100)], ["Resets", resets]]));
+  return `
+    <div class="meter" data-level="${lvl}">
+      <div class="meter-head">
+        <span class="meter-name">${esc(name)}</span>
+        <span class="meter-value">${badge}<b>${usd(b.cost)}</b> of ${usd(b.limit)}</span>
+      </div>
+      <div class="meter-wrap" ${tipHTML}>
+        <div class="meter-bar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(b.pct)}" aria-label="${esc(name)} used">
+          <div class="meter-fill" data-w="${Math.min(100, b.pct)}%"></div>
+        </div>
+        <div class="meter-now" style="left:${elapsed * 100}%" title="Time elapsed in this period"></div>
+      </div>
+      <div class="meter-foot">
+        <span>Resets in <b>${esc(duration(b.end - now))}</b> · ${esc(resets)}</span>
+        <span>${pct(b.pct)} used</span>
+      </div>
+    </div>`;
+}
+
+function budgetPanel(source) {
+  const budgets = state.data.limits[source].budgets;
+  if (!budgets.length) return "";
+  return `<div class="panel"><div class="source-head">${glyph(source)}<span class="name">${SOURCE_LABEL[source]} budgets</span><span class="aside"><button class="link-btn" data-go="settings">Edit</button></span></div>
+    <div class="rows">${budgets.map(budgetMeterHTML).join("")}</div></div>`;
+}
+
 function forecastReason(reason) {
   if (/^only /.test(reason)) return "A forecast appears 12 hours into the week.";
   if (/no weekly window/.test(reason)) return "No weekly window in progress.";
@@ -943,6 +1030,12 @@ function syncAside(src) {
 function allowancePanel(source) {
   const src = state.data.limits[source];
   const head = `<div class="source-head">${glyph(source)}<span class="name">${SOURCE_LABEL[source]}</span>${src.plan ? `<span class="plan">${esc(src.plan)}</span>` : ""}<span class="aside">${esc(syncAside(src))}</span></div>`;
+  const budgetRows = src.budgets.map(budgetMeterHTML);
+  // Billed per token: no plan limits to report, so the budgets lead.
+  if (budgetRows.length && !src.five_hour && !src.weekly) {
+    return `<div class="panel"><div class="source-head">${glyph(source)}<span class="name">${SOURCE_LABEL[source]}</span><span class="plan">Your budgets</span><span class="aside"><button class="link-btn" data-go="settings">Edit</button></span></div>
+      <div class="rows">${budgetRows.join("")}</div></div>`;
+  }
   if (src.status === "waiting") {
     return `<div class="panel">${head}<div class="empty-state"><h3>Waiting for the first sync</h3>
       Limits come straight from Anthropic, using the login Claude Code already keeps in your Keychain.
@@ -960,6 +1053,7 @@ function allowancePanel(source) {
   if (src.status === "error") rows.push(`<div class="empty-state" style="padding:12px 18px 0;color:var(--crit-ink)">Last sync failed: ${esc(src.error || "")}</div>`);
   if (src.five_hour) rows.push(meterHTML("5-hour window", src.five_hour, "five_hour", src));
   if (src.weekly) rows.push(meterHTML("Weekly limit", src.weekly, "weekly", src));
+  rows.push(...budgetRows);
   return `<div class="panel">${head}<div class="rows">${rows.join("")}</div></div>`;
 }
 
@@ -1225,7 +1319,7 @@ views.limits = () => {
     }).join("");
     const onlyWeekly = !src.five_hour ? (src.plan ? " · " : "") + "Weekly window only on this plan" : "";
     return `<div class="panel"><div class="source-head">${glyph(source)}<span class="name">${SOURCE_LABEL[source]}</span><span class="plan">${esc((src.plan || "") + onlyWeekly)}</span><span class="aside">${esc(syncAside(src))}</span></div>
-      <div class="window-grid ${kinds.length === 1 ? "single" : ""}">${windows}</div></div>`;
+      <div class="window-grid ${kinds.length === 1 ? "single" : ""}">${windows}</div></div>${budgetPanel(source)}`;
   }).join("");
 
   const forecasts = shown.map(source => {
@@ -1275,7 +1369,9 @@ views.limits = () => {
   }).join("");
 
   const synced = shown.map(s => state.data.limits[s]).filter(s => s.status === "ok" || s.status === "error");
-  return viewHead("Limits", synced.length ? "Reported by the providers themselves · synced every 10 minutes" : "Not synced yet") + blocks + forecasts;
+  const hasBudgets = shown.some(s => state.data.limits[s].budgets.length);
+  const budgetLink = hasBudgets ? "" : `<button class="link-btn" data-go="settings">Billed per token? Set a budget</button>`;
+  return viewHead("Limits", synced.length ? "Reported by the providers themselves · synced every 10 minutes" : "Not synced yet", budgetLink) + blocks + forecasts;
 };
 
 views.cost = () => {
@@ -1537,6 +1633,152 @@ views.models = () => {
       "No model usage in this period.");
 };
 
+/* ===================== Settings ===================== */
+function priceText(v) { return v == null ? "" : String(Number(Number(v).toFixed(4))); }
+function moneyInput(value, attrs, { cls = "", placeholder = "", prefix = "$" } = {}) {
+  return `<label class="money ${cls}">${prefix ? `<span aria-hidden="true">${prefix}</span>` : ""}<input type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${esc(value)}" placeholder="${esc(placeholder)}" ${attrs}></label>`;
+}
+
+function pricesPanel() {
+  const src = state.settingsSource, list = state.settings.prices;
+  const label = SOURCE_LABEL[src];
+  const isShown = m => m.message_count > 0 || m.edited || !m.listed;
+  const shown = state.showAllPrices ? list.models : list.models.filter(isShown);
+  const hidden = list.models.length - list.models.filter(isShown).length;
+  const field = (m, key, name) => {
+    const changed = m.edited && Math.abs(m.price[key] - m.built_in[key]) > 1e-9;
+    return `<td class="r">${moneyInput(priceText(m.price[key]),
+      `data-price="${esc(m.model)}" data-field="${key}" data-focus-key="price:${esc(m.model)}:${key}" aria-label="${esc(m.model)} ${name} price" ${changed ? `title="Built-in: $${priceText(m.built_in[key])}"` : ""}`)}</td>`;
+  };
+  const rows = shown.map(m => `<tr>
+      <td><div class="s-name">${esc(m.model)}${m.edited ? `<span class="tag">Edited</span>` : ""}</div>
+        <div class="s-meta">${m.message_count ? `${usd(m.cost)} · ${int(m.message_count)} messages` : m.listed ? "Not used yet" : "Not in the built-in list"}</div></td>
+      ${field(m, "input", "input")}${field(m, "output", "output")}${field(m, "cached_input", "cache read")}
+      <td class="r">${m.edited ? `<button class="link-btn" data-price-reset="${esc(m.model)}">Reset</button>` : ""}</td>
+    </tr>`).join("");
+  const cacheNote = src === "claude"
+    ? "Cache writes cost 1.25× the input price for 5-minute caching and 2× for 1-hour caching, as Anthropic bills them."
+    : "Priority and Flex service tiers scale these prices, as OpenAI bills them.";
+  const reference = list.reference ? `Built-in prices: ${esc(list.reference)}${list.verified ? `, checked ${esc(list.verified)}` : ""}.` : "";
+  return `<div class="panel">
+    <div class="panel-head wrap"><div class="panel-title">${icon("cost")}API prices</div>
+      <div class="seg compact" role="group" aria-label="Price list">${["claude", "codex"].map(k => `<button data-settings-source="${k}" aria-pressed="${k === src}">${SOURCE_LABEL[k]}</button>`).join("")}</div></div>
+    <div class="panel-body" style="padding-bottom:6px"><p class="settings-note">Dollars per million tokens. Every cost in Token Meter uses these, and changing one reprices all your past usage. ${cacheNote} ${reference}</p></div>
+    <div class="table-wrap"><table class="data prices">
+      <thead><tr><th>Model</th><th class="r">Input</th><th class="r">Output</th><th class="r">Cache read</th><th></th></tr></thead>
+      <tbody>${rows || `<tr><td colspan="5" class="muted">No ${label} models yet.</td></tr>`}</tbody>
+    </table></div>
+    ${hidden || state.showAllPrices ? `<div class="more-row"><button class="link-btn" data-toggle-prices>${state.showAllPrices ? "Show only models you use" : `Show all ${list.models.length} models in the price list`}</button></div>` : ""}
+    <div class="add-price">
+      <span class="lbl">Add a model</span>
+      ${moneyInput("", `data-add="model" data-focus-key="add:model" aria-label="Model name"`, { cls: "name", prefix: "", placeholder: src === "claude" ? "Model name, e.g. claude-opus-6" : "Model name, e.g. gpt-6" })}
+      ${moneyInput("", `data-add="input" data-focus-key="add:input" aria-label="Input price"`, { cls: "wide", placeholder: "Input" })}
+      ${moneyInput("", `data-add="output" data-focus-key="add:output" aria-label="Output price"`, { cls: "wide", placeholder: "Output" })}
+      ${moneyInput("", `data-add="cached_input" data-focus-key="add:cached_input" aria-label="Cache read price"`, { cls: "wide", placeholder: "Cache read" })}
+      <button class="btn" data-add-price>Add</button>
+    </div>
+    <div class="panel-foot">
+      <span class="note">${list.edited_count ? `${list.edited_count} edited ${list.edited_count === 1 ? "price" : "prices"}` : "Using the built-in prices"}</span>
+      <button class="btn" data-reset-prices ${list.edited_count ? "" : "disabled"}>Reset ${label} prices to built-in</button>
+    </div>
+  </div>`;
+}
+
+function budgetsPanel() {
+  const periods = [["day", "Daily", "Today"], ["week", "Weekly", "This week (from Monday)"], ["month", "Monthly", "This month"]];
+  const blocks = ["claude", "codex"].map(src => {
+    const b = state.settings.budgets[src];
+    const fields = periods.map(([k, name, when]) => `<div class="budget-field">
+        <span class="k">${name}</span>
+        ${moneyInput(b.amounts[k] != null ? priceText(b.amounts[k]) : "", `data-budget="${src}" data-budget-period="${k}" data-focus-key="budget:${src}:${k}" aria-label="${SOURCE_LABEL[src]} ${name.toLowerCase()} budget"`, { cls: "wide", placeholder: "No budget" })}
+        <span class="spent">${esc(when)}: ${usd(b.spent[k] || 0)}</span>
+      </div>`).join("");
+    const any = Object.keys(b.amounts).length;
+    return `<div class="budget-src"><div class="source-head">${glyph(src)}<span class="name">${SOURCE_LABEL[src]}</span>${any ? `<span class="aside"><button class="link-btn" data-clear-budgets="${src}">Clear</button></span>` : ""}</div>
+      <div class="budget-grid">${fields}</div></div>`;
+  }).join("");
+  return `<div class="panel">
+    <div class="panel-head"><div class="panel-title">${icon("gauge")}Budgets</div></div>
+    <div class="panel-body" style="padding-bottom:4px"><p class="settings-note">Billed per token instead of a plan? Set your own spending limits. Token Meter tracks them like plan limits: in the menu bar and on Limits, turning orange at 75% and red at 90%. Leave a box empty for no budget.</p></div>
+    ${blocks}
+  </div>`;
+}
+
+views.settings = () => {
+  const sub = `<span class="save-state ${state.settingsError ? "err" : ""}">${esc(state.settingsError || state.saveState || "Stored on this Mac, kept across updates")}</span>`;
+  if (!state.settings) {
+    return viewHead("Settings", sub) + `<div class="panel"><div class="empty-state">${state.settingsError ? "" : `Loading<span class="loading-dots"></span>`}</div></div>`;
+  }
+  return viewHead("Settings", sub) + pricesPanel() + budgetsPanel();
+};
+
+async function loadSettings() {
+  try {
+    state.settings = await api(`/api/app/settings?source=${state.settingsSource}`);
+    state.settingsError = null;
+  } catch (e) {
+    state.settingsError = String(e.message || e);
+  }
+  render();
+}
+
+function parseMoney(input) {
+  const raw = input.value.replace(/[$,\s]/g, "");
+  if (raw === "") return { empty: true };
+  const value = Number(raw);
+  const ok = Number.isFinite(value) && value >= 0;
+  input.closest(".money")?.classList.toggle("invalid", !ok);
+  return ok ? { value } : { invalid: true };
+}
+
+async function saveSettings(path, params, done) {
+  state.saveState = "Saving…";
+  state.settingsError = null;
+  render();
+  try {
+    const query = new URLSearchParams({ ...params, view: state.settingsSource });
+    state.settings = await api(`${path}?${query}`, { method: "POST" });
+    state.saveState = done;
+    await refresh();
+  } catch (e) {
+    state.settingsError = String(e.message || e);
+    state.saveState = "";
+    render();
+  }
+}
+
+function savePriceRow(model) {
+  const params = { source: state.settingsSource, model };
+  let empty = 0;
+  for (const input of document.querySelectorAll(`[data-price="${CSS.escape(model)}"]`)) {
+    const v = parseMoney(input);
+    if (v.invalid) { state.settingsError = "Prices must be numbers of $0 or more."; render(); return; }
+    if (v.empty) { empty++; continue; }
+    params[input.dataset.field] = v.value;
+  }
+  if (empty === 3) params.reset = "1";
+  saveSettings("/api/app/prices", params, `Saved ${model} · all usage repriced`);
+}
+
+function saveBudgets(src) {
+  const params = { source: src };
+  for (const input of document.querySelectorAll(`[data-budget="${src}"]`)) {
+    const v = parseMoney(input);
+    if (v.invalid || v.value === 0) { input.closest(".money")?.classList.add("invalid"); state.settingsError = "A budget must be more than $0, or empty for none."; render(); return; }
+    if (!v.empty) params[input.dataset.budgetPeriod] = v.value;
+  }
+  saveSettings("/api/app/budgets", params, `Saved ${SOURCE_LABEL[src]} budgets`);
+}
+
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.price) savePriceRow(t.dataset.price);
+  else if (t.dataset.budget) saveBudgets(t.dataset.budget);
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && e.target.closest?.("[data-add]")) $("[data-add-price]")?.click();
+});
+
 /* ===================== Shell ===================== */
 function renderSidebar() {
   document.querySelectorAll("#source-seg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.source === state.source));
@@ -1550,7 +1792,7 @@ function renderSidebar() {
     const out = [s.five_hour?.pct, s.weekly?.pct].filter(v => v != null).map(level);
     if (s.forecast?.exhaustion_at && s.weekly && s.forecast.exhaustion_at < s.weekly.end) out.push("crit");
     return out;
-  });
+  }).concat(sourcesShown().flatMap(s => state.data.limits[s].budgets.map(b => level(b.pct))));
   const alert = $("#nav-limit-alert");
   alert.hidden = !levels.some(l => l !== "ok");
   alert.className = "nav-alert" + (levels.includes("crit") ? "" : " warn");
@@ -1568,9 +1810,20 @@ function renderSidebar() {
 function render() {
   tips.clear();
   charts.length = 0;
+  // A background refresh re-renders the page; keep whatever is being typed.
+  const active = document.activeElement?.dataset?.focusKey ? document.activeElement : null;
+  const typing = active && { key: active.dataset.focusKey, value: active.value, start: active.selectionStart, end: active.selectionEnd };
   renderSidebar();
   document.querySelectorAll(".view").forEach(v => { v.hidden = v.dataset.view !== state.view; });
   const el = $("#view-" + state.view);
+  if (state.view === "settings") {
+    el.innerHTML = views.settings();
+    if (typing) {
+      const input = el.querySelector(`[data-focus-key="${CSS.escape(typing.key)}"]`);
+      if (input) { input.value = typing.value; input.focus(); input.setSelectionRange(typing.start, typing.end); }
+    }
+    return;
+  }
   if (!state.data) {
     el.innerHTML = viewHead({ overview: "Overview", limits: "Limits", cost: "Cost", sessions: "Sessions", projects: "Projects", models: "Models" }[state.view], "") + (state.error
       ? `<div class="panel"><div class="empty-state"><h3>Couldn't load your usage</h3>${esc(state.error)}<p style="margin:10px 0 0"><button class="sync-btn" data-retry>Try again</button></p></div></div>`
@@ -1606,6 +1859,7 @@ function go(view) {
   if (location.hash !== "#" + view) history.replaceState(null, "", "#" + view);
   state.view = view;
   if (view === "sessions" && !state.sessions && state.data) refresh();
+  if (view === "settings") { state.saveState = ""; loadSettings(); }
   render();
   $("#main").scrollTop = 0;
   window.scrollTo(0, 0);
@@ -1633,6 +1887,52 @@ document.addEventListener("click", e => {
     refresh(); return;
   }
   if (t.closest("[data-retry]")) { state.error = null; render(); refresh(); return; }
+  const settingsSrc = t.closest("[data-settings-source]");
+  if (settingsSrc) {
+    if (settingsSrc.dataset.settingsSource === state.settingsSource) return;
+    state.settingsSource = settingsSrc.dataset.settingsSource;
+    state.showAllPrices = false; state.saveState = ""; state.settingsError = null;
+    loadSettings(); return;
+  }
+  if (t.closest("[data-toggle-prices]")) { state.showAllPrices = !state.showAllPrices; render(); return; }
+  const priceReset = t.closest("[data-price-reset]");
+  if (priceReset) {
+    const model = priceReset.dataset.priceReset;
+    saveSettings("/api/app/prices", { source: state.settingsSource, model, reset: "1" }, `Reset ${model} to the built-in price`);
+    return;
+  }
+  if (t.closest("[data-add-price]")) {
+    const params = { source: state.settingsSource };
+    const name = $("[data-add=model]").value.trim();
+    if (!name) { state.settingsError = "Enter a model name, as it appears in your logs."; render(); return; }
+    params.model = name;
+    for (const key of ["input", "output", "cached_input"]) {
+      const v = parseMoney($(`[data-add="${key}"]`));
+      if (v.invalid) { state.settingsError = "Prices must be numbers of $0 or more."; render(); return; }
+      if (!v.empty) params[key] = v.value;
+    }
+    if (params.input == null || params.output == null) { state.settingsError = "Enter at least the input and output prices."; render(); return; }
+    saveSettings("/api/app/prices", params, `Added ${name}`);
+    return;
+  }
+  const resetAll = t.closest("[data-reset-prices]");
+  if (resetAll) {
+    // Two clicks, since this throws away every edited price for the source.
+    if (!resetAll.classList.contains("confirm")) {
+      resetAll.classList.add("confirm");
+      resetAll.textContent = "Click again to reset";
+      setTimeout(() => { if (resetAll.isConnected) render(); }, 3000);
+      return;
+    }
+    saveSettings("/api/app/prices/reset", { source: state.settingsSource }, `${SOURCE_LABEL[state.settingsSource]} prices reset to built-in`);
+    return;
+  }
+  const clearBudgets = t.closest("[data-clear-budgets]");
+  if (clearBudgets) {
+    const src = clearBudgets.dataset.clearBudgets;
+    saveSettings("/api/app/budgets", { source: src }, `Cleared ${SOURCE_LABEL[src]} budgets`);
+    return;
+  }
   if (t.closest("#sync-btn")) {
     const btn = t.closest("#sync-btn");
     btn.classList.add("spinning"); btn.disabled = true;

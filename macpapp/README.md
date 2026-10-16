@@ -11,7 +11,9 @@ The app's source. To build, install or release it, see the
 | `usage-core-checks` | Core logic checks (XCTest isn't available with the Command Line Tools alone) |
 
 `Resources/web/index.html` is the dashboard UI. `Resources/pricing_*.json` hold
-the API prices, copied into the app at build time. `Resources/AppIcon.icns` is
+the built-in API prices, copied into the app at build time. Prices and budgets
+set in the app's Settings page live in the database (the `user_settings` row of
+`meta`) and are layered on top, so app updates never overwrite them. `Resources/AppIcon.icns` is
 drawn by `../scripts/make-icon.swift`.
 
 ## 🛠️ Development

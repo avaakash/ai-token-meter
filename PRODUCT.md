@@ -8,13 +8,13 @@ web
 
 ## Users
 
-Anyone who uses Claude Code and/or the Codex CLI on a subscription plan (Pro/Max, ChatGPT plans) and runs this dashboard locally. The page must make sense to a stranger on first launch, including when one source is not installed or not yet synced, and when there is little or no history.
+Anyone who uses Claude Code and/or the Codex CLI on this Mac: mostly people on a subscription plan (Pro/Max, ChatGPT plans), and also people billed per token through the API, who track their own budgets instead of plan limits. The page must make sense to a stranger on first launch, including when one source is not installed or not yet synced, and when there is little or no history.
 
 They open it to answer two questions, with equal weight:
-1. **Am I near my limits?** Current 5-hour and weekly usage %, when each resets, and whether the current pace will exhaust the weekly quota before the reset.
+1. **Am I near my limits?** Current 5-hour and weekly usage %, when each resets, and whether the current pace will exhaust the weekly quota before the reset. For per-token users, the limits are their own daily, weekly or monthly dollar budgets.
 2. **What did it cost?** The API-equivalent dollar value of their usage for a chosen period, and how it trends.
 
-Drilling into sessions, projects and models is a secondary, investigative job.
+Drilling into sessions, projects and models is a secondary, investigative job. Settings (editing per-model prices, setting budgets) is occasional upkeep.
 
 ## Product Purpose
 
@@ -28,7 +28,7 @@ Everything runs on the user's machine from logs the CLIs already write: no accou
 
 - Token Meter, the native macOS menu bar app (`macpapp/`), shows the dashboard in a WKWebView over an `app://` scheme. Its page is `macpapp/Resources/web/index.html`, which started from `design/dashboard-redesign.html`. The retired Python dashboard (`legacy-python/`, served at `http://127.0.0.1:4870/`) keeps its own `index.html` and `sessions.html`.
 - The project website is `docs/index.html` (GitHub Pages), a Persuade surface for downloading the app.
-- Data API: `/api/usage?source=all|claude|codex`, `/api/all-sessions`, `/api/session?id=`, `/api/limit-snapshots`, `/api/weekly-usage`, `POST /api/remote-usage/poll`.
+- Data API: `/api/usage?source=all|claude|codex`, `/api/app/dashboard`, `/api/app/transcript?id=`, `/api/app/settings`, `/api/all-sessions`, `/api/session?id=`, `/api/limit-snapshots`, `/api/weekly-usage`; writes are `POST /api/remote-usage/poll`, `/api/app/prices`, `/api/app/prices/reset` and `/api/app/budgets`, with parameters in the query string.
 - Auto-refreshes every 60s; remote limits re-sync every 10 minutes or on "Sync now".
 - Sources: Claude, Codex, or both combined.
 
@@ -38,6 +38,8 @@ Everything runs on the user's machine from logs the CLIs already write: no accou
 - Must work in light and dark themes.
 - Session naming: Claude sessions carry a custom or AI-generated title when Claude Code recorded one; many older Claude sessions and most Codex sessions have none, so the UI needs a meaningful fallback (not the bare folder name).
 - Dollar values are hypothetical for subscription users and must be labeled as API-equivalent estimates.
+- Prices are the built-in tables (`macpapp/Resources/pricing_*.json`) with the user's own per-model edits layered on top; an edit reprices all stored usage, and Reset always restores the built-in price. User settings live in the local database and survive app updates.
+- Budgets use the same allowance language as plan limits: a meter per calendar day, week (from Monday) or month, amber at 75%, red at 90%.
 
 ## Evidence on Hand
 

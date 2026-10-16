@@ -2,7 +2,7 @@ import Foundation
 
 final class ClaudeSource: UsageSource {
     let name = "claude"
-    let pricing: Pricing
+    var pricing: Pricing
 
     static let usageURL = URL(string: "https://api.anthropic.com/api/oauth/usage")!
     static let keychainService = "Claude Code-credentials"

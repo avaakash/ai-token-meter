@@ -336,6 +336,7 @@
     <symbol id="i-sessions" viewBox="0 0 20 20"><path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/><circle cx="4" cy="5.5" r="0.9"/><circle cx="4" cy="10" r="0.9"/><circle cx="4" cy="14.5" r="0.9"/></symbol>
     <symbol id="i-turns" viewBox="0 0 20 20"><path d="M4 16.5V11M8 16.5V6M12 16.5V9M16 16.5V3.5"/></symbol>
     <symbol id="i-folder" viewBox="0 0 20 20"><path d="M2.8 6.2a1.8 1.8 0 0 1 1.8-1.8h3.2l1.8 1.9h5.8a1.8 1.8 0 0 1 1.8 1.8v6.7a1.8 1.8 0 0 1-1.8 1.8H4.6a1.8 1.8 0 0 1-1.8-1.8z"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 20 20"><path d="M3 6h7.5M14.5 6H17M3 14h2.5M9.5 14H17"/><circle cx="12.5" cy="6" r="2"/><circle cx="7.5" cy="14" r="2"/></symbol>
     <symbol id="i-chip" viewBox="0 0 20 20"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8"/><rect x="8.3" y="8.3" width="3.4" height="3.4" rx="0.6"/><path d="M8 2.8v2.7M12 2.8v2.7M8 14.5v2.7M12 14.5v2.7M2.8 8h2.7M2.8 12h2.7M14.5 8h2.7M14.5 12h2.7"/></symbol>
     <symbol id="i-alert" viewBox="0 0 20 20"><path d="M10 3.4 17.3 16H2.7z"/><path d="M10 8.2v3.6"/><circle cx="10" cy="13.9" r="0.4"/></symbol>
     <symbol id="i-info" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 9v4.6"/><circle cx="10" cy="6.4" r="0.4"/></symbol>
@@ -449,6 +450,7 @@
           <button role="tab" aria-selected="false" data-view="session"><svg class="icon"><use href="#i-turns"/></svg><b>One session</b><p>Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.</p></button>
           <button role="tab" aria-selected="false" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg><b>Projects</b><p>Where the spend goes, repo by repo.</p></button>
           <button role="tab" aria-selected="false" data-view="models"><svg class="icon"><use href="#i-chip"/></svg><b>Models</b><p>Which models you lean on, and what each one costs.</p></button>
+          <button role="tab" aria-selected="false" data-view="settings"><svg class="icon"><use href="#i-sliders"/></svg><b>Settings</b><p>Your own price for any model, with a reset to the built-in list, and budgets if you pay per token.</p></button>
         </div>
         <div role="tabpanel" aria-label="Dashboard screenshot">
           <p class="shot-desc" id="shot-desc"></p>
@@ -465,6 +467,7 @@
               <button class="hit" style="top:28.5%" data-view="sessions" tabindex="-1" aria-label="Sessions"></button>
               <button class="hit" style="top:32.6%" data-view="projects" tabindex="-1" aria-label="Projects"></button>
               <button class="hit" style="top:36.7%" data-view="models" tabindex="-1" aria-label="Models"></button>
+              <button class="hit" style="top:43%" data-view="settings" tabindex="-1" aria-label="Settings"></button>
             </div>
           </div>
           <p class="shot-caption">Light and Dark follow your Mac. Screenshots use made-up data.</p>
@@ -501,6 +504,7 @@
         <li><h3>The limits are the real ones.</h3><p>The percentages come from the providers. Claude's are read with the login Claude Code already keeps in your Keychain, and Codex's from <code>codex app-server</code>. Both refresh every 10 minutes, or when you click Sync Now. These two checks are the only network calls the app makes.</p></li>
         <li><h3>Forecasts come from your own weeks.</h3><p>"On pace to finish the week near 78%" is projected from the shape of your past weeks, with a range, not a straight line from Monday. Estimates are always labeled as estimates.</p></li>
         <li><h3>The dollars are hypothetical.</h3><p>On a Claude Pro or Max plan, or ChatGPT Plus or Pro, nobody bills you per token. Token Meter shows what the same tokens would cost on the API, which is either reassuring or alarming.</p></li>
+        <li><h3>Your prices, your budgets.</h3><p>Change any model's price in Settings, or add one the built-in list doesn't have, and every past message is repriced. Paying per token? Set daily, weekly or monthly budgets and watch them like plan limits. One click puts the built-in prices back.</p></li>
         <li><h3>Small and native.</h3><p>A universal Swift app of about 2 MB. No account, no analytics, no Electron, no background server.</p></li>
       </ul>
     </div>
@@ -545,7 +549,8 @@
         <details><summary>Why does it ask for my Keychain?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Claude's live limit percentage is read with the token Claude Code stored there when you logged in. Deny it and everything else still works; the Claude limit cards fall back to estimates.</p></details>
         <details><summary>Do I need both Claude Code and Codex?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>No. Token Meter shows whichever you use, and you can switch between Claude, Codex or both in the sidebar.</p></details>
         <details><summary>Why isn't it on the Mac App Store?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>The App Store sandbox would block reading <code>~/.claude</code>, the Keychain item and the <code>codex</code> binary, which is the whole app.</p></details>
-        <details><summary>The prices look wrong.<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Pricing lives in two JSON files in the repository. Edit them and rebuild, and old messages are repriced on the next launch. Pull requests with updated prices are welcome.</p></details>
+        <details><summary>The prices look wrong.<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Open Settings → API prices and change any model's price; all your past usage is repriced right away. Reset puts back the built-in price for one model or for all of them, and you can add models the built-in list doesn't have yet. Pull requests that update the built-in prices are welcome.</p></details>
+        <details><summary>I pay per token, not for a plan.<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Set your own limits in Settings → Budgets: a daily, weekly or monthly dollar amount for Claude, Codex or both. They show up on Limits and in the menu bar like plan limits, turning orange at 75% and red at 90%.</p></details>
         <details><summary>How do I uninstall it?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Quit it from the menu bar, then delete Token Meter from Applications and the folder <code>~/Library/Application Support/TokenMeter</code>.</p></details>
       </div>
     </div>
@@ -702,6 +707,7 @@
     session: "Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.",
     projects: "Where the spend goes, repo by repo.",
     models: "Which models you lean on, and what each one costs.",
+    settings: "Your own price for any model, with a reset to the built-in list, and budgets if you pay per token.",
   };
   const alts = {
     overview: "The Overview: Claude and Codex limits, the API-equivalent cost split by source and model, and recent sessions",
@@ -711,6 +717,7 @@
     session: "One session: total cost, turns, a cost-per-turn chart and each turn's prompt and tools",
     projects: "The Projects view: cost by project",
     models: "The Models view: cost by model",
+    settings: "Settings: an editable price for each model, and daily, weekly and monthly budgets",
   };
   for (const v of Object.keys(views)) new Image().src = `assets/screenshots/${v}-light.png`;
   const shot = $("shot");

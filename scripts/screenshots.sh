@@ -23,7 +23,7 @@ session="$(sqlite3 "$demo/usage.sqlite3" "SELECT session_id FROM messages WHERE 
   AND timestamp > strftime('%Y-%m-%dT%H:%M:%S', 'now', '-3 days') GROUP BY session_id ORDER BY SUM(cost) DESC LIMIT 1")"
 
 mkdir -p "$out"
-for view in overview limits cost sessions projects models "session/$session"; do
+for view in overview limits cost sessions projects models settings "session/$session"; do
   for theme in light dark; do
     "$CHROME" --headless --disable-gpu --hide-scrollbars --force-device-scale-factor=2 --window-size=1280,820 \
       --virtual-time-budget=8000 --screenshot="$out/${view%%/*}-$theme.png" \

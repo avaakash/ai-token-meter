@@ -2,7 +2,7 @@ import Foundation
 
 final class CodexSource: UsageSource {
     let name = "codex"
-    let pricing: Pricing
+    var pricing: Pricing
 
     // Codex windows aren't labeled; bucket them by their reported length.
     static let fiveHourMinutes = 200.0...400.0

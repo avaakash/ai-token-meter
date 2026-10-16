@@ -36,10 +36,48 @@ public final class Router {
         }
 
         if method == "POST" {
-            guard path == "/api/remote-usage/poll" else { return notFound }
-            let source = qs["source"] ?? "claude"
-            guard sources.contains(source) else { return error(400, unknown) }
-            return json { try self.store.pollRemoteUsage(source) }
+            // Settings arrive as query parameters: WebKit doesn't reliably pass
+            // request bodies to a custom URL scheme handler.
+            func amounts(_ keys: [String]) throws -> [String: Double] {
+                var out: [String: Double] = [:]
+                for key in keys {
+                    guard let value = qs[key] else { continue }
+                    guard let number = Double(value.trimmingCharacters(in: .whitespaces)) else {
+                        throw ValidationError(description: "\(key) must be a number")
+                    }
+                    out[key] = number
+                }
+                return out
+            }
+            switch path {
+            case "/api/remote-usage/poll":
+                let source = qs["source"] ?? "claude"
+                guard sources.contains(source) else { return error(400, unknown) }
+                return json { try self.store.pollRemoteUsage(source) }
+            case "/api/app/prices":
+                guard let source = qs["source"], sources.contains(source) else { return error(400, unknown) }
+                return validated {
+                    let fields = qs["reset"] == "1" ? nil : try amounts(UsageStore.priceFields)
+                    try self.store.sync { try self.store.setPrice(source, model: qs["model"] ?? "", fields: fields) }
+                    return try self.store.sync { try self.store.settingsPayload(source) }
+                }
+            case "/api/app/prices/reset":
+                let source = qs["source"]
+                if let source, !sources.contains(source) { return error(400, unknown) }
+                return validated {
+                    try self.store.sync { try self.store.resetPrices(source) }
+                    return try self.store.sync { try self.store.settingsPayload(source ?? "claude") }
+                }
+            case "/api/app/budgets":
+                guard let source = qs["source"], sources.contains(source) else { return error(400, unknown) }
+                return validated {
+                    let budgets = try amounts(UsageStore.budgetPeriods)
+                    try self.store.sync { try self.store.setBudgets(source, budgets) }
+                    return try self.store.sync { try self.store.settingsPayload(qs["view"].flatMap { sources.contains($0) ? $0 : nil } ?? source) }
+                }
+            default:
+                return notFound
+            }
         }
 
         if let page = Router.staticPage(path: path, webRoot: webRoot) { return page }
@@ -52,6 +90,10 @@ public final class Router {
             guard let source = validSource() else { return error(400, unknownWithAll) }
             let days = min(3650, max(1, qs["days"].flatMap { Int($0) } ?? 7))
             return json { try self.store.sync { try self.store.buildAppDashboard(source, days: days) } }
+        case "/api/app/settings":
+            let source = qs["source"] ?? "claude"
+            guard sources.contains(source) else { return error(400, unknown) }
+            return json { try self.store.sync { try self.store.settingsPayload(source) } }
         case "/api/app/transcript":
             guard let id = qs["id"] else { return error(400, "missing id") }
             return json { try self.store.sync { try self.store.buildTranscript(sessionId: id) } }
@@ -101,6 +143,17 @@ public final class Router {
 
     private func error(_ status: Int, _ message: String) -> APIResponse {
         APIResponse(status: status, contentType: "application/json", body: encodeJSON(["error": message]))
+    }
+
+    /// Like `json`, but a rejected value is the caller's mistake (400), not ours.
+    private func validated(_ producer: () throws -> Any) -> APIResponse {
+        do {
+            return APIResponse(status: 200, contentType: "application/json", body: encodeJSON(try producer()))
+        } catch let invalid as ValidationError {
+            return self.error(400, invalid.description)
+        } catch {
+            return self.error(500, errorText(error))
+        }
     }
 
     private func json(_ producer: () throws -> Any) -> APIResponse {

@@ -62,7 +62,7 @@ struct RemoteWindows {
 
 protocol UsageSource: AnyObject {
     var name: String { get }
-    var pricing: Pricing { get }
+    var pricing: Pricing { get set }
     func logFiles(home: String) -> [String]
     func scanFile(_ db: SQLiteDB, path: String, state: [String: FileState], home: String) throws
     func computeCosts(model: String?, timestamp: String?, tokens: TokenFields) -> Costs
@@ -107,8 +107,10 @@ public final class UsageStore {
         try FileManager.default.createDirectory(
             atPath: (paths.databasePath as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
         db = try SQLiteDB(path: paths.databasePath)
-        claude = ClaudeSource(pricing: try Pricing(path: paths.pricingDirectory + "/pricing_claude.json"))
-        codex = CodexSource(pricing: try Pricing(path: paths.pricingDirectory + "/pricing_codex.json"))
+        try db.exec("CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT)")
+        let settings = try Self.readSettings(db)
+        claude = ClaudeSource(pricing: try Self.loadPricing(paths, "claude", settings))
+        codex = CodexSource(pricing: try Self.loadPricing(paths, "codex", settings))
         sources = [claude, codex]
         try initDB()
     }
@@ -315,7 +317,7 @@ public final class UsageStore {
     /// Full recompute when either pricing file changed since the last run
     /// (same combined hash as the Python dashboard, so a shared database
     /// isn't needlessly recomputed). Startup only — it walks every row.
-    private func ensurePricingCurrent() throws {
+    func ensurePricingCurrent() throws {
         let joined = sources.map(\.pricing.fileHash).joined()
         let combined = SHA256.hash(data: Data(joined.utf8)).map { String(format: "%02x", $0) }.joined()
         let stored = try db.queryOne("SELECT value FROM meta WHERE key = 'pricing_hash'")?.string("value")

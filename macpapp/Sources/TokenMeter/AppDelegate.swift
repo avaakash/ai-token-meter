@@ -136,6 +136,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if let pct = primary.fiveHour?.percent { parts.append("5h \(Int(pct.rounded()))%"); highest = max(highest, pct) }
             if let pct = primary.weekly?.percent { parts.append("W \(Int(pct.rounded()))%"); highest = max(highest, pct) }
         }
+        // Billed per token instead of on a plan: show the budgets the person set.
+        if parts.isEmpty, let budgeted = summaries.filter({ !$0.budgets.isEmpty })
+            .max(by: { ($0.budgets.map(\.percent).max() ?? 0) < ($1.budgets.map(\.percent).max() ?? 0) }) {
+            for b in budgeted.budgets.prefix(2) {
+                parts.append("\(Self.budgetShortLabel[b.period] ?? b.period) \(Int(b.percent.rounded()))%")
+                highest = max(highest, b.percent)
+            }
+        }
         let text = " " + (parts.isEmpty ? (summaries.isEmpty ? "…" : "–") : parts.joined(separator: " · "))
         let color: NSColor? = highest >= 90 ? .systemRed : highest >= 75 ? .systemOrange : nil
         button.attributedTitle = NSAttributedString(
@@ -150,14 +158,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } else if store == nil {
             menu.addItem(disabled("Indexing logs…"))
         }
-        for s in summaries where s.fiveHour != nil || s.weekly != nil || s.lastError != nil {
+        for s in summaries where s.fiveHour != nil || s.weekly != nil || s.lastError != nil || !s.budgets.isEmpty {
             menu.addItem(heading(label(s.source)))
             if let w = s.fiveHour { menu.addItem(disabled("5-hour: " + describe(w))) }
             if let w = s.weekly { menu.addItem(disabled("Weekly: " + describe(w))) }
-            if let error = s.lastError { menu.addItem(disabled("Sync failed: \(error)")) }
+            for b in s.budgets { menu.addItem(disabled(describe(b))) }
+            if let error = s.lastError, s.fiveHour != nil || s.weekly != nil || s.budgets.isEmpty {
+                menu.addItem(disabled("Sync failed: \(error)"))
+            }
         }
         menu.addItem(.separator())
         menu.addItem(item("Open Dashboard", #selector(openDashboard), "o"))
+        menu.addItem(item("Settings…", #selector(openSettings), ","))
         let sync = item(polling ? "Syncing…" : "Sync Now", #selector(pollNow), "R")
         sync.isEnabled = store != nil && !polling
         menu.addItem(sync)
@@ -171,6 +183,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func label(_ source: String) -> String { source == "codex" ? "Codex" : "Claude" }
+
+    private static let budgetShortLabel = ["day": "Day", "week": "Wk", "month": "Mo"]
+    private static let budgetLabel = ["day": "Daily budget", "week": "Weekly budget", "month": "Monthly budget"]
+
+    private func describe(_ b: BudgetSummary) -> String {
+        let spent = String(format: "$%.2f of $%.2f", b.cost, b.limit)
+        return "\(Self.budgetLabel[b.period] ?? b.period): \(spent) · \(Int(b.percent.rounded()))%"
+    }
 
     private func describe(_ w: WindowSummary) -> String {
         let used = w.percent.map { "\(Int($0.rounded()))% used" } ?? String(format: "$%.2f (no %% reported)", w.cost)
@@ -222,6 +242,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         windowController?.show()
     }
 
+    @objc private func openSettings() {
+        openDashboard()
+        windowController?.showView("settings")
+    }
+
     @objc private func reloadDashboard(_ sender: Any?) { windowController?.reloadPage(sender) }
 
     @objc private func toggleLoginItem() {
@@ -258,7 +283,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             main.addItem(holder)
         }
         let selectAll = NSMenuItem(title: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        let settings = NSMenuItem(title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settings.target = self
         submenu("Token Meter", [
+            settings,
+            .separator(),
             NSMenuItem(title: "Hide Token Meter", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h"),
             .separator(),
             NSMenuItem(title: "Quit Token Meter", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"),

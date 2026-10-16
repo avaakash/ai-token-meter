@@ -322,5 +322,64 @@ withTempStore { store, _ in
           && (body?["by_source"] as? [Any])?.count == 2, "app dashboard payload on an empty store")
 }
 
+// MARK: Settings: the person's own prices and budgets
+
+withTempStore { store, home in
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let stamp = formatter.string(from: Date())
+    try writeLines(home + "/.claude/projects/-repo/s.jsonl", [[
+        "type": "assistant", "timestamp": stamp, "cwd": "/repo", "sessionId": "s1",
+        "message": ["id": "m1", "model": "claude-sonnet-5-5", "usage": ["input_tokens": 1_000_000, "output_tokens": 1_000_000]],
+    ]])
+    try store.sync { try store.scanAll() }
+    func cost() throws -> Double { try store.db.queryOne("SELECT cost FROM messages")?.double("cost") ?? -1 }
+    func models() throws -> [[String: Any]] { try store.sync { try store.priceList("claude") }["models"] as? [[String: Any]] ?? [] }
+
+    let first = try models().first
+    let builtIn = first?["built_in"] as? [String: Double] ?? [:]
+    check(first?["model"] as? String == "claude-sonnet-5-5" && first?["edited"] as? Bool == false, "used models lead the price list")
+    let base = try cost()
+    check(close(base, (builtIn["input"] ?? 0) + (builtIn["output"] ?? 0)), "built-in price applies by default")
+
+    try store.sync {
+        try store.setPrice("claude", model: "claude-sonnet-5-5",
+                           fields: ["input": 1, "output": 2, "cached_input": builtIn["cached_input"] ?? 0])
+    }
+    check(close(try cost(), 3), "an edited price reprices stored messages")
+    let edited = try models().first
+    check((edited?["price"] as? [String: Double])?["input"] == 1 && edited?["edited"] as? Bool == true, "the list shows the edited price")
+    let saved = (try UsageStore.readSettings(store.db)["prices"] as? [String: Any])?["claude"] as? [String: Any]
+    check(saved?["claude-sonnet-5-5"] as? [String: Double] == ["input": 1, "output": 2], "fields equal to the built-in price aren't stored")
+    let reopened = try UsageStore(paths: store.paths)
+    check(close(reopened.claude.pricing.resolveRate(model: "claude-sonnet-5-5-20261001", timestamp: stamp).input, 1),
+          "edited prices survive a restart and cover dated snapshots")
+
+    try store.sync { try store.setPrice("claude", model: "claude-sonnet-5-5", fields: nil) }
+    check(close(try cost(), base), "resetting a model restores the built-in price")
+    try store.sync { try store.setPrice("claude", model: "claude-new-model", fields: ["input": 3, "output": 15]) }
+    check(try models().contains { $0["model"] as? String == "claude-new-model" && $0["edited"] as? Bool == true },
+          "an added model is kept even at the fallback price")
+    try store.sync { try store.resetPrices("claude") }
+    check(try UsageStore.readSettings(store.db)["prices"] == nil, "reset clears the source's prices")
+    check((try? store.sync { try store.setPrice("claude", model: "x", fields: ["input": -1]) }) == nil, "negative prices are rejected")
+
+    try store.sync { try store.setBudgets("claude", ["day": base / 2, "month": base * 4]) }
+    let status = try store.sync { try store.budgetStatus("claude") }
+    check(status.count == 2 && close(status[0]["pct"] as? Double, 200) && close(status[1]["pct"] as? Double, 25),
+          "budgets measure the current period's spend")
+    check(try store.limitSummaries().first { $0.source == "claude" }?.budgets.count == 2, "menu bar summaries carry budgets")
+    check((try? store.sync { try store.setBudgets("claude", ["day": 0]) }) == nil, "a zero budget is rejected")
+
+    let router = Router(store: store, webRoot: repoRoot + "/macpapp/Resources/web")
+    check(router.handle(method: "POST", path: "/api/app/prices", query: "source=claude&model=claude-sonnet-5-5&input=abc").status == 400,
+          "a non-numeric price is a 400")
+    let saveBudget = router.handle(method: "POST", path: "/api/app/budgets", query: "source=codex&week=50")
+    let body = try? JSONSerialization.jsonObject(with: saveBudget.body) as? [String: Any]
+    let codexAmounts = ((body?["budgets"] as? [String: Any])?["codex"] as? [String: Any])?["amounts"] as? [String: Double]
+    check(saveBudget.status == 200 && codexAmounts == ["week": 50], "the budgets route saves and returns settings")
+    check(router.handle(method: "GET", path: "/api/app/settings", query: "source=codex").status == 200, "settings route")
+}
+
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

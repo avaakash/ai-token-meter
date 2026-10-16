@@ -105,7 +105,21 @@ final class DashboardWindowController: NSWindowController, NSWindowDelegate, WKN
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        pageLoaded = true
         applySystemColors()
+        if let view = pendingView {
+            pendingView = nil
+            showView(view)
+        }
+    }
+
+    private var pageLoaded = false
+    private var pendingView: String?
+
+    /// Switches the page to one of its views, e.g. "settings".
+    func showView(_ view: String) {
+        guard pageLoaded else { pendingView = view; return }
+        webView.evaluateJavaScript("location.hash = '#\(view)'")
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }

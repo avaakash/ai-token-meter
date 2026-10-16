@@ -188,7 +188,7 @@ extension UsageStore {
         return [
             "status": state, "error": orNull(lastError), "synced_at": orNull(polledAt),
             "five_hour": window("five_hour"), "weekly": window("weekly"),
-            "forecast": forecast, "history": history,
+            "forecast": forecast, "history": history, "budgets": try budgetStatus(source),
         ]
     }
 }

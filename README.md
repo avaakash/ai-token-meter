@@ -45,6 +45,7 @@ Everything stays on your Mac. 🔒 No account, no telemetry, no server.
 | 🏷️ **Real session names** | Uses the names from the Claude app and Codex, your renames first. No more staring at UUIDs. |
 | 🔥 **Activity** | A year-long heatmap, your streaks, and which hours of the week you burn the most tokens. |
 | 🗂️ **Projects and models** | Where the spend goes, per repo and per model. |
+| ⚙️ **Your prices, your budgets** | Edit any model's price or add new ones, and reset to the built-in list anytime. Billed per token? Set daily, weekly or monthly budgets and track them like plan limits. |
 | 🌗 **Feels like a Mac app** | Sidebar vibrancy, your accent colour, Light/Dark and Increase Contrast, all applied live. |
 
 <table>
@@ -166,8 +167,18 @@ the `codex` binary, which is the whole app.
 <details>
 <summary><b>The prices look off.</b></summary>
 
-Edit `macpapp/Resources/pricing_claude.json` or `pricing_codex.json` and rebuild. Old messages
-are repriced on the next launch. Pull requests with updated prices are welcome.
+Open **Settings → API prices** and change any model's price. All your past usage
+is repriced right away. **Reset** puts back the built-in price for one model, or
+for every model at once, and you can add models the built-in list doesn't have yet.
+Pull requests that update the built-in prices are welcome.
+</details>
+
+<details>
+<summary><b>I pay per token, not for a plan.</b></summary>
+
+Set your own limits in **Settings → Budgets**: a daily, weekly (from Monday) or
+monthly dollar amount for Claude, Codex or both. They show up on Limits and in
+the menu bar like plan limits, turning orange at 75% and red at 90%.
 </details>
 
 <details>

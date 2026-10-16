@@ -23,22 +23,32 @@ public struct Rate {
 }
 
 /// A `pricing_<source>.json` table: dated per-model rates, prefix fallbacks,
-/// and optional long-context tiers.
+/// and optional long-context tiers, plus the person's own per-model prices
+/// layered on top.
 public struct Pricing {
     public let raw: [String: Any]
     public let fileHash: String
+    /// Model name → the fields the person set ("input", "output", "cached_input").
+    public let overrides: [String: [String: Double]]
     private let models: [String: [[String: Any]]]
     private let namesLongestFirst: [String]
     private let prefixFallback: [(String, [String: Any])]
     private let unknownDefault: [String: Any]
 
-    public init(path: String) throws {
+    public init(path: String, overrides: [String: [String: Double]] = [:]) throws {
         let data = try Data(contentsOf: URL(fileURLWithPath: path))
         guard let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw SQLiteError(description: "\(path) is not a JSON object")
         }
         self.raw = raw
-        fileHash = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        self.overrides = overrides
+        // Unchanged without overrides, so a database shared with the Python
+        // dashboard isn't needlessly repriced.
+        var hashed = data
+        if !overrides.isEmpty, let extra = try? JSONSerialization.data(withJSONObject: overrides, options: [.sortedKeys]) {
+            hashed.append(extra)
+        }
+        fileHash = SHA256.hash(data: hashed).map { String(format: "%02x", $0) }.joined()
         models = raw["models"] as? [String: [[String: Any]]] ?? [:]
         namesLongestFirst = models.keys.sorted { $0.count > $1.count }
         prefixFallback = (raw["prefix_fallback"] as? [[Any]] ?? []).compactMap { pair in
@@ -50,6 +60,13 @@ public struct Pricing {
 
     public var lastVerified: String? { raw["last_verified"] as? String }
     public var sourceNote: String? { raw["source"] as? String }
+    public var modelNames: [String] { models.keys.sorted() }
+
+    /// Whether the table has its own entry for this model (or the dated
+    /// snapshot's base), rather than pricing it by family or default.
+    public func isListed(_ model: String) -> Bool {
+        models[model] != nil || namesLongestFirst.contains { model.hasPrefix($0 + "-") && isDateSuffix(String(model.dropFirst($0.count + 1))) }
+    }
 
     public func tierMultiplier(_ tier: String?) -> Double {
         let multipliers = raw["tier_multipliers"] as? [String: Any] ?? [:]
@@ -59,17 +76,21 @@ public struct Pricing {
     /// pricing.resolve_rate: the latest dated entry at or before `timestamp`,
     /// with dated snapshots (`<model>-YYYYMMDD` / `-YYYY-MM-DD`) inheriting the
     /// base model's schedule, then the long-context tier if the prompt is long.
-    public func resolveRate(model: String?, timestamp: String?, promptTokens: Int = 0) -> Rate {
+    /// A person's price for a model replaces the table's for every date and
+    /// prompt length; fields they left alone keep the table's value.
+    public func resolveRate(model: String?, timestamp: String?, promptTokens: Int = 0, useOverrides: Bool = true) -> Rate {
         let model = model ?? "unknown"
-        var schedule = models[model]
-        if schedule == nil {
+        var listedName: String? = models[model] == nil ? nil : model
+        if listedName == nil {
             for name in namesLongestFirst where model.hasPrefix(name + "-") {
                 if isDateSuffix(String(model.dropFirst(name.count + 1))) {
-                    schedule = models[name]
+                    listedName = name
                     break
                 }
             }
         }
+        let schedule = listedName.flatMap { models[$0] }
+        let override = useOverrides ? (overrides[model] ?? listedName.flatMap { overrides[$0] }) : nil
 
         let chosen: [String: Any]
         if let schedule, !schedule.isEmpty {
@@ -95,6 +116,10 @@ public struct Pricing {
         }
 
         var rate = Rate(chosen)
+        if let override {
+            rate.overlay(override as [String: Any])
+            return rate
+        }
         if let longContext = chosen["long_context"] as? [String: Any],
            let above = (longContext["above_tokens"] as? NSNumber)?.intValue, promptTokens > above {
             rate.overlay(longContext)
