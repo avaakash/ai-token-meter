@@ -1,9 +1,8 @@
 name: CI
 
+# Manual only for now: Actions → CI → Run workflow.
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   build:

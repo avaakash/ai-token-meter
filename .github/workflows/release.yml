@@ -1,41 +1,84 @@
 name: Release
 
+# Manual only: Actions → Release → Run workflow, on main.
 on:
-  push:
-    tags: ["v*"]
   workflow_dispatch:
     inputs:
-      tag:
-        description: "Tag to release, e.g. v1.2.0"
+      version:
+        description: "Version to release, e.g. 1.2.0 (tagged as v1.2.0)"
         required: true
+      prerelease:
+        description: "Mark as a pre-release"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
   release:
     runs-on: macos-latest
     env:
-      TAG: ${{ inputs.tag || github.ref_name }}
+      VERSION: ${{ inputs.version }}
+      PRERELEASE: ${{ inputs.prerelease }}
     steps:
+      - name: Require main
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::Releases run only from main (this run is on $GITHUB_REF)."
+            exit 1
+          fi
+
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check the version
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version must look like 1.2.0, got '$VERSION'."
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error::Tag v$VERSION already exists."
+            exit 1
+          fi
+          echo "TAG=v$VERSION" >> "$GITHUB_ENV"
 
       - name: Run checks
         run: swift run --package-path macpapp usage-core-checks
 
       - name: Build universal app and DMG
-        run: VERSION="${TAG#v}" ./build.sh --dmg
+        run: ./build.sh --dmg
 
-      - name: Checksum
-        run: cd build && shasum -a 256 TokenMeter.dmg > TokenMeter.dmg.sha256
+      - name: Verify the build
+        run: |
+          app="build/Token Meter.app"
+          archs="$(lipo -archs "$app/Contents/MacOS/TokenMeter")"
+          [[ " $archs " == *" arm64 "* && " $archs " == *" x86_64 "* ]] || { echo "::error::Not universal: $archs"; exit 1; }
+          built="$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app/Contents/Info.plist")"
+          [[ "$built" == "$VERSION" ]] || { echo "::error::App reports $built, expected $VERSION"; exit 1; }
+          codesign --verify --deep --strict "$app"
+          hdiutil verify build/TokenMeter.dmg
+          cd build && shasum -a 256 TokenMeter.dmg > TokenMeter.dmg.sha256 && cat TokenMeter.dmg.sha256
 
-      - name: Publish release
+      - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" build/TokenMeter.dmg build/TokenMeter.dmg.sha256 --clobber
-          else
-            gh release create "$TAG" build/TokenMeter.dmg build/TokenMeter.dmg.sha256 \
-              --title "Token Meter ${TAG#v}" --generate-notes
-          fi
+          flags=(--title "Token Meter $VERSION" --generate-notes --target "$GITHUB_SHA")
+          [[ "$PRERELEASE" == "true" ]] && flags+=(--prerelease) || flags+=(--latest)
+          gh release create "$TAG" build/TokenMeter.dmg build/TokenMeter.dmg.sha256 "${flags[@]}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Token Meter $VERSION released"
+            echo
+            echo "- Release: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/releases/tag/$TAG"
+            echo "- SHA-256: \`$(cut -d' ' -f1 build/TokenMeter.dmg.sha256)\`"
+          } >> "$GITHUB_STEP_SUMMARY"

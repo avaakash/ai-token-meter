@@ -6,9 +6,9 @@
 
 **Your Claude Code and Codex limits in the menu bar, plus the API bill you're not paying.** 🧾
 
-<a href="https://github.com/avaakash/claude-api-pricing-visualizer/releases/latest/download/TokenMeter.dmg"><img src="docs/assets/download-for-mac.svg" alt="Download for Mac" width="236"></a>
+<a href="https://github.com/avaakash/ai-token-meter/releases/latest/download/TokenMeter.dmg"><img src="docs/assets/download-for-mac.svg" alt="Download for Mac" width="236"></a>
 
-[**Website**](https://avaakash.github.io/claude-api-pricing-visualizer/) · [Releases](https://github.com/avaakash/claude-api-pricing-visualizer/releases) · [Build from source](#-build-from-source)
+[**Website**](https://avaakash.github.io/ai-token-meter/) · [Releases](https://github.com/avaakash/ai-token-meter/releases) · [Build from source](#-build-from-source)
 
 ![macOS 13+](https://img.shields.io/badge/macOS-13%2B-000000?logo=apple&logoColor=white)
 ![Universal](https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-universal-0A84FF)
@@ -70,7 +70,7 @@ Everything stays on your Mac. 🔒 No account, no telemetry, no server.
 
 ## 📦 Install
 
-1. **[Download `TokenMeter.dmg`](https://github.com/avaakash/claude-api-pricing-visualizer/releases/latest/download/TokenMeter.dmg)** from the latest release.
+1. **[Download `TokenMeter.dmg`](https://github.com/avaakash/ai-token-meter/releases/latest/download/TokenMeter.dmg)** from the latest release.
 2. Open it and drag **Token Meter** into **Applications**.
 3. Open Token Meter. Look for the gauge in your menu bar. 🎉
 
@@ -98,8 +98,8 @@ You only need the Xcode Command Line Tools (`xcode-select --install`). No Xcode,
 no Apple Developer account.
 
 ```sh
-git clone https://github.com/avaakash/claude-api-pricing-visualizer.git
-cd claude-api-pricing-visualizer
+git clone https://github.com/avaakash/ai-token-meter.git
+cd ai-token-meter
 ./build.sh --install
 ```
 
@@ -197,12 +197,14 @@ python3 scripts/demo-data.py /tmp/token-meter-demo    # prints the serve command
 | `macpapp/Sources/TokenMeter/` | Menu bar app and window |
 | `macpapp/Resources/web/index.html` | The dashboard UI |
 | `macpapp/Sources/usage-cli/` | The backend without the UI, for debugging |
-| `docs/` | The [website](https://avaakash.github.io/claude-api-pricing-visualizer/) |
+| `docs/` | The [website](https://avaakash.github.io/ai-token-meter/) |
 | `legacy-python/` | The original browser dashboard (retired) |
 
-Releases are built by GitHub Actions: push a `v*` tag and
+Releases are built by GitHub Actions, by hand: **Actions → Release → Run
+workflow** on `main`, with a version such as `1.2.0`.
 [`release.yml`](.github/workflows/release.yml) runs the checks, builds the
-universal DMG and attaches it to a release.
+universal DMG, verifies it, tags `v1.2.0` and publishes a release with the DMG,
+its SHA-256 and generated notes.
 
 ## 🐍 The old Python dashboard
 
