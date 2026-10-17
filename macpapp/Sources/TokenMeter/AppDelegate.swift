@@ -9,6 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var router: Router?
     private var startupError: String?
     private var summaries: [SourceSummary] = []
+    private var menuBar = MenuBarConfig.default
     private var polling = false
     private let ready = DispatchGroup()
     private let background = DispatchQueue(label: "token-meter.background", qos: .utility)
@@ -22,8 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         signal(SIGPIPE, SIG_IGN)
         NSApp.mainMenu = buildMainMenu()
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.image = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent",
-                                           accessibilityDescription: "Token Meter")
+        statusItem.button?.image = Self.gauge
         statusItem.button?.imagePosition = .imageLeading
         statusItem.button?.title = " …"
         let menu = NSMenu()
@@ -112,8 +112,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let store else { return }
         background.async {
             let summaries = (try? store.limitSummaries()) ?? []
+            let menuBar = (try? store.menuBarConfig()) ?? .default
             DispatchQueue.main.async {
                 self.summaries = summaries
+                self.menuBar = menuBar
                 self.updateStatusTitle()
             }
         }
@@ -121,34 +123,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     // MARK: Status item
 
+    private static let gauge = NSImage(systemSymbolName: "gauge.with.dots.needle.50percent", accessibilityDescription: "Token Meter")
+
     private func updateStatusTitle() {
         guard let button = statusItem.button else { return }
-        if startupError != nil {
-            button.title = " !"
+        let (entries, highest, spoken) = startupError == nil ? statusEntries() : ([], 0, [])
+        guard !entries.isEmpty else {
+            button.image = Self.gauge
+            button.imagePosition = .imageLeading
+            button.attributedTitle = NSAttributedString(string: startupError != nil ? " !" : summaries.isEmpty ? " …" : " –")
+            button.toolTip = "Token Meter"
             return
         }
-        let claude = summaries.first { $0.source == "claude" }
-        let primary = (claude?.fiveHour?.percent != nil || claude?.weekly?.percent != nil)
-            ? claude : summaries.first { $0.weekly?.percent != nil }
-        var parts: [String] = []
-        var highest = 0.0
-        if let primary {
-            if let pct = primary.fiveHour?.percent { parts.append("5h \(Int(pct.rounded()))%"); highest = max(highest, pct) }
-            if let pct = primary.weekly?.percent { parts.append("W \(Int(pct.rounded()))%"); highest = max(highest, pct) }
+        let alert: NSColor? = highest >= 90 ? .systemRed : highest >= 75 ? .systemOrange : nil
+        button.image = StatusRenderer.image(entries, alert: alert)
+        button.imagePosition = .imageOnly
+        button.title = ""
+        let description = spoken.joined(separator: "; ")
+        button.toolTip = "Token Meter — " + description
+        button.setAccessibilityLabel("Token Meter: " + description)
+    }
+
+    private func statusEntries() -> ([StatusEntry], Double, [String]) {
+        let entries = menuBar.entries(summaries)
+        let drawn = entries.map { e in
+            StatusEntry(source: e.source, label: e.label, value: "\(e.shown)%",
+                        detail: menuBar.showReset ? e.resetsAt.map { StatusRenderer.compactDuration(until: $0) } : nil)
         }
-        // Billed per token instead of on a plan: show the budgets the person set.
-        if parts.isEmpty, let budgeted = summaries.filter({ !$0.budgets.isEmpty })
-            .max(by: { ($0.budgets.map(\.percent).max() ?? 0) < ($1.budgets.map(\.percent).max() ?? 0) }) {
-            for b in budgeted.budgets.prefix(2) {
-                parts.append("\(Self.budgetShortLabel[b.period] ?? b.period) \(Int(b.percent.rounded()))%")
-                highest = max(highest, b.percent)
-            }
+        let spoken = zip(entries, drawn).map { e, d in
+            "\(label(e.source)) \(e.name) \(e.shown)% \(menuBar.showLeft ? "left" : "used")" + (d.detail.map { ", resets in \($0)" } ?? "")
         }
-        let text = " " + (parts.isEmpty ? (summaries.isEmpty ? "…" : "–") : parts.joined(separator: " · "))
-        let color: NSColor? = highest >= 90 ? .systemRed : highest >= 75 ? .systemOrange : nil
-        button.attributedTitle = NSAttributedString(
-            string: text, attributes: color.map { [.foregroundColor: $0] } ?? [:])
-        button.toolTip = "Token Meter — 5-hour and weekly limit usage" + (primary.map { " (\(label($0.source)))" } ?? "")
+        return (drawn, entries.map(\.used).max() ?? 0, spoken)
     }
 
     func menuNeedsUpdate(_ menu: NSMenu) {

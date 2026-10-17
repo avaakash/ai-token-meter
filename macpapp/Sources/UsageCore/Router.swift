@@ -74,6 +74,16 @@ public final class Router {
                     try self.store.sync { try self.store.editGroups(action: action, id: qs["id"], name: qs["name"], model: qs["model"]) }
                     return try self.store.sync { try self.store.settingsPayload(qs["view"].flatMap { sources.contains($0) ? $0 : nil } ?? "claude") }
                 }
+            case "/api/app/menubar":
+                return validated {
+                    if qs["reset"] == "default" {
+                        try self.store.sync { try self.store.resetMenuBar() }
+                    } else {
+                        let items = (qs["items"] ?? "").split(separator: ",").map(String.init)
+                        try self.store.sync { try self.store.setMenuBar(items: items, value: qs["value"] ?? "used", reset: qs["time"] == "1") }
+                    }
+                    return try self.store.sync { try self.store.settingsPayload(qs["view"].flatMap { sources.contains($0) ? $0 : nil } ?? "claude") }
+                }
             case "/api/app/budgets":
                 guard let source = qs["source"], sources.contains(source) else { return error(400, unknown) }
                 return validated {

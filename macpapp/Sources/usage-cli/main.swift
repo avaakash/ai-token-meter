@@ -7,6 +7,7 @@ import UsageCore
 //   usage-cli ... get '/api/usage?source=all'
 //   usage-cli ... post '/api/remote-usage/poll?source=claude'
 //   usage-cli ... --web Resources/web --port 4871 serve   (development preview)
+//   usage-cli ... menubar   (what the menu bar item would show, one item per line)
 
 var options: [String: String] = [:]
 var positional: [String] = []
@@ -91,6 +92,15 @@ case "get", "post":
     FileHandle.standardError.write(Data("HTTP \(response.status)\n".utf8))
     FileHandle.standardOutput.write(response.body)
     exit(response.status == 200 ? 0 : 1)
+case "menubar":
+    // Tab-separated: source, label, shown %, reset as a Unix time (or -).
+    do {
+        for e in try store.menuBarConfig().entries(try store.limitSummaries()) {
+            print([e.source, e.label, String(e.shown), e.resetsAt.map { String(Int($0.timeIntervalSince1970)) } ?? "-"].joined(separator: "\t"))
+        }
+    } catch {
+        fail("menubar failed: \(error)")
+    }
 default:
     fail("unknown command: \(command)")
 }

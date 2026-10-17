@@ -20,7 +20,7 @@ PACKAGE="$REPO_ROOT/macpapp"
 APP_NAME="Token Meter"
 EXECUTABLE="TokenMeter"
 BUNDLE_ID="${BUNDLE_ID:-io.github.avaakash.token-meter}"
-VERSION="${VERSION:-1.0.0}"
+VERSION="${VERSION:-1.1.0}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/Applications}"
 APP_DB_DIR="$HOME/Library/Application Support/TokenMeter"
 

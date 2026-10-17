@@ -450,7 +450,7 @@
           <button role="tab" aria-selected="false" data-view="session"><svg class="icon"><use href="#i-turns"/></svg><b>One session</b><p>Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.</p></button>
           <button role="tab" aria-selected="false" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg><b>Projects</b><p>Where the spend goes, repo by repo.</p></button>
           <button role="tab" aria-selected="false" data-view="models"><svg class="icon"><use href="#i-chip"/></svg><b>Models</b><p>Which models you lean on, and what each one costs.</p></button>
-          <button role="tab" aria-selected="false" data-view="settings"><svg class="icon"><use href="#i-sliders"/></svg><b>Settings</b><p>Budgets if you pay per token, your own price for any model with a reset to the built-in list, and model groups.</p></button>
+          <button role="tab" aria-selected="false" data-view="settings"><svg class="icon"><use href="#i-sliders"/></svg><b>Settings</b><p>What the menu bar shows, budgets if you pay per token, your own price for any model with a reset to the built-in list, and model groups.</p></button>
         </div>
         <div role="tabpanel" aria-label="Dashboard screenshot">
           <p class="shot-desc" id="shot-desc"></p>
@@ -547,6 +547,7 @@
         <details><summary>Am I being charged these amounts?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>No. On a subscription the dollar figures are what the same tokens would cost on the pay-per-token API. They're there for perspective, not billing.</p></details>
         <details><summary>Does anything leave my Mac?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Only the two limit checks, which go to Anthropic and to OpenAI (through the <code>codex</code> CLI) using the logins you already have. Your logs, prompts and costs stay on your machine.</p></details>
         <details><summary>Why does it ask for my Keychain?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Claude's live limit percentage is read with the token Claude Code stored there when you logged in. Deny it and everything else still works; the Claude limit cards fall back to estimates.</p></details>
+        <details><summary>Can I change what the menu bar shows?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Yes. In Settings → Menu bar, pick up to three of Claude's and Codex's 5-hour and weekly windows, show usage as used or left, and add the time until each resets. Claude and Codex are told apart by their icons.</p></details>
         <details><summary>Do I need both Claude Code and Codex?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>No. Token Meter shows whichever you use, and you can switch between Claude, Codex or both in the sidebar.</p></details>
         <details><summary>Why isn't it on the Mac App Store?<svg class="icon"><use href="#i-chevron"/></svg></summary><p>The App Store sandbox would block reading <code>~/.claude</code>, the Keychain item and the <code>codex</code> binary, which is the whole app.</p></details>
         <details><summary>The prices look wrong.<svg class="icon"><use href="#i-chevron"/></svg></summary><p>Open Settings → API prices and change any model's price; all your past usage is repriced right away. Reset puts back the built-in price for one model or for all of them, and you can add models the built-in list doesn't have yet. Pull requests that update the built-in prices are welcome.</p></details>
@@ -707,7 +708,7 @@
     session: "Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.",
     projects: "Where the spend goes, repo by repo.",
     models: "Which models you lean on, and what each one costs.",
-    settings: "Budgets if you pay per token, your own price for any model with a reset to the built-in list, and model groups.",
+    settings: "What the menu bar shows, budgets if you pay per token, your own price for any model with a reset to the built-in list, and model groups.",
   };
   const alts = {
     overview: "The Overview: Claude and Codex limits, the API-equivalent cost split by source and model, and recent sessions",

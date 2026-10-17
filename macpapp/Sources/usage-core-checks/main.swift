@@ -440,5 +440,58 @@ withTempStore { store, home in
     check(router.handle(method: "POST", path: "/api/app/groups", query: "action=create&name=Team").status == 200, "groups route")
 }
 
+// MARK: Menu bar settings
+
+withTempStore { store, _ in
+    let initial = try store.menuBarConfig()
+    check(initial == .default && initial.items.map(\.source) == ["claude", "claude"] && !initial.showLeft && !initial.customized,
+          "the menu bar defaults to Claude's 5-hour and weekly, as used")
+    try store.sync { try store.setMenuBar(items: ["codex:weekly", "claude:five_hour"], value: "left", reset: true) }
+    let saved = try store.menuBarConfig()
+    check(saved.items.map { "\($0.source):\($0.window)" } == ["claude:five_hour", "codex:weekly"] && saved.showLeft && saved.showReset
+          && saved.customized, "items keep a fixed order, with left and time until reset")
+    for (items, value, why) in [([String](), "used", "no items"), (["claude:five_hour", "claude:weekly", "codex:five_hour", "codex:weekly"], "used", "four items"),
+                                (["claude:weekly", "claude:weekly"], "used", "a repeated item"), (["claude:daily"], "used", "an unknown item"),
+                                (["claude:weekly"], "half", "an unknown value")] {
+        check((try? store.sync { try store.setMenuBar(items: items, value: value, reset: false) }) == nil, "rejects \(why)")
+    }
+    check(try store.menuBarConfig() == saved, "a rejected change leaves the settings alone")
+    try store.sync { try store.resetMenuBar() }
+    check(try store.menuBarConfig() == .default, "reset restores the default")
+
+    let router = Router(store: store, webRoot: repoRoot + "/macpapp/Resources/web")
+    let response = router.handle(method: "POST", path: "/api/app/menubar", query: "items=codex:five_hour,codex:weekly&value=used&time=1")
+    let menubar = (try? JSONSerialization.jsonObject(with: response.body) as? [String: Any])?["menubar"] as? [String: Any]
+    check(response.status == 200 && menubar?["items"] as? [String] == ["codex:five_hour", "codex:weekly"] && menubar?["reset"] as? Bool == true
+          && menubar?["max"] as? Int == 3, "the menu bar route saves and returns settings")
+    check(router.handle(method: "POST", path: "/api/app/menubar", query: "items=").status == 400, "an empty menu bar is a 400")
+}
+
+do {
+    let reset = Date(timeIntervalSince1970: 2_000_000_000)
+    func window(_ pct: Double?) -> WindowSummary { WindowSummary(percent: pct, cost: 0, resetsAt: reset, isRemote: true) }
+    func summary(_ source: String, _ five: Double?, _ week: Double?, budgets: [BudgetSummary] = []) -> SourceSummary {
+        SourceSummary(source: source, fiveHour: five.map { window($0) }, weekly: week.map { window($0) }, lastError: nil, budgets: budgets)
+    }
+    let both = [summary("claude", 41, 63), summary("codex", nil, 34)]
+    let byDefault = MenuBarConfig.default.entries(both)
+    check(byDefault.map { "\($0.source) \($0.label) \($0.shown)" } == ["claude 5h 41", "claude W 63"], "default entries: Claude 5h and weekly, used")
+    check(byDefault.first?.resetsAt == reset, "entries carry the reset time")
+
+    let custom = MenuBarConfig(saved: ["items": ["claude:five_hour", "codex:five_hour", "codex:weekly"], "value": "left", "reset": true])
+    check(custom.entries(both).map { "\($0.source) \($0.label) \($0.shown) \($0.used)" } == ["claude 5h 59 41.0", "codex W 66 34.0"],
+          "left shows 100 minus used; a window that isn't reported is left out")
+
+    let codexOnly = [summary("claude", nil, nil), summary("codex", nil, 34)]
+    check(MenuBarConfig.default.entries(codexOnly).map(\.source) == ["codex"], "the untouched default falls back to Codex")
+    let mine = MenuBarConfig(saved: ["items": ["claude:weekly"], "value": "used", "reset": false])
+    check(mine.entries(codexOnly).isEmpty, "a chosen setup doesn't silently swap sources")
+
+    let budget = BudgetSummary(period: "day", limit: 20, cost: 15, percent: 75, resetsAt: reset)
+    let perToken = [summary("claude", nil, nil, budgets: [budget]), summary("codex", nil, nil)]
+    check(MenuBarConfig.default.entries(perToken).map { "\($0.source) \($0.label) \($0.shown)" } == ["claude Day 75"],
+          "with no plan limits, budgets stand in")
+}
+
 print("\(checks - failures)/\(checks) checks passed")
 exit(failures == 0 ? 0 : 1)

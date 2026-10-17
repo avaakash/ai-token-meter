@@ -401,6 +401,33 @@
   }
   .link-btn.danger { color: var(--crit-ink); }
   .link-btn.confirm { color: var(--crit-ink); font-weight: 650; }
+  .mb-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 28px; align-items: start; }
+  .mb-k { font-size: 12px; font-weight: 600; color: var(--ink-2); margin-bottom: 7px; }
+  .mb-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .mb-item {
+    display: flex; align-items: center; gap: 8px; padding: 7px 10px; border: 0; border-radius: 8px; cursor: pointer; text-align: left;
+    background: var(--panel); box-shadow: 0 0 0 1px var(--hair-strong); font-size: 12.5px; font-weight: 550; color: var(--ink-2);
+  }
+  .mb-item .glyph { width: 15px; height: 15px; color: var(--ink-3); }
+  .mb-item:hover:not(:disabled) { box-shadow: 0 0 0 1px var(--ink-3); }
+  .mb-item[aria-pressed="true"] { background: var(--plan-wash); box-shadow: 0 0 0 1.5px var(--plan); color: var(--ink); }
+  .mb-item[aria-pressed="true"] .glyph { color: var(--plan); }
+  .mb-item:disabled { opacity: 0.45; cursor: default; }
+  .mb-opts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  .check { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--ink-2); cursor: pointer; }
+  .check input { width: 14px; height: 14px; margin: 0; accent-color: var(--plan); }
+  .mb-preview {
+    display: flex; justify-content: flex-end; align-items: center; gap: 14px; height: 30px; padding: 0 12px; border-radius: 8px;
+    background: var(--panel-2); box-shadow: 0 0 0 1px var(--hair); font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden;
+  }
+  .mb-entry { display: inline-flex; align-items: baseline; gap: 4px; }
+  .mb-entry .glyph { width: 13px; height: 13px; align-self: center; }
+  .mb-entry .lbl, .mb-entry .det { font-size: 11px; font-weight: 500; opacity: 0.7; }
+  .mb-entry.missing { opacity: 0.4; }
+  .mb-preview[data-level="warn"] .mb-entry { color: var(--warn-ink); }
+  .mb-preview[data-level="crit"] .mb-entry { color: var(--crit-ink); }
+  .mb-preview .clock { color: var(--ink-2); }
+  .settings-note .glyph { width: 13px; height: 13px; vertical-align: -2px; }
   .new-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 18px; border-top: 1px solid var(--hair); }
 
   .sessions-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
@@ -537,6 +564,7 @@
     .share-row { grid-template-columns: minmax(0, 1fr) 80px; }
     .share-row .share-bar-cell { grid-column: 1 / -1; order: 3; }
     .budget-grid { grid-template-columns: minmax(0, 1fr); }
+    .mb-grid { grid-template-columns: minmax(0, 1fr); }
     .hide-sm { display: none; }
   }
   .no-motion *, .no-motion *::before, .no-motion *::after { transition: none !important; animation: none !important; }
@@ -1455,8 +1483,8 @@ views.cost = () => {
         <div class="panel-body" style="padding-top:2px">${capacityHTML(modelParts, total, "cost-models")}</div>
       </div>
     </div>
-    ${groupCostPanel(total)}
     ${state.source === "all" ? `<div class="grid g-2">${perSource.map(st => sourceCostPanel(st, total, days)).join("")}</div>` : ""}
+    ${groupCostPanel(total)}
     <div class="panel">
       <div class="panel-head"><div class="panel-title">Cost per ${series.unit}, by token type</div><div class="panel-aside">${esc(periodLabel())}</div></div>
       <div class="panel-body">
@@ -1794,6 +1822,71 @@ function groupsPanel() {
   </div>`;
 }
 
+const MENU_BAR_ITEMS = [["claude", "five_hour", "5-hour"], ["claude", "weekly", "Weekly"], ["codex", "five_hour", "5-hour"], ["codex", "weekly", "Weekly"]];
+
+// Same wording as the app's status item: "45m", "3h 20m", "2d 5h".
+function compactDuration(ms) {
+  const minutes = Math.max(0, Math.round(ms / MIN));
+  if (minutes < 60) return minutes + "m";
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return minutes % 60 ? `${hours}h ${minutes % 60}m` : `${hours}h`;
+  return hours % 24 ? `${Math.floor(hours / 24)}d ${hours % 24}h` : `${Math.floor(hours / 24)}d`;
+}
+
+function menuBarPreview(mb) {
+  let highest = 0;
+  const entries = mb.items.map(key => {
+    const [src, win] = key.split(":");
+    const w = state.data?.limits[src]?.[win];
+    const label = win === "five_hour" ? "5h" : "W";
+    if (!w || w.pct == null) {
+      return `<span class="mb-entry missing" title="${SOURCE_LABEL[src]} hasn't reported this yet; it's left out until it does">${glyph(src)}<span class="lbl">${label}</span><span>–</span></span>`;
+    }
+    highest = Math.max(highest, w.pct);
+    const shown = Math.round(mb.value === "left" ? Math.max(0, 100 - w.pct) : w.pct);
+    return `<span class="mb-entry">${glyph(src)}<span class="lbl">${label}</span><span>${shown}%</span>${mb.reset ? `<span class="det">${esc(compactDuration(w.end - Date.now()))}</span>` : ""}</span>`;
+  }).join("");
+  const clock = new Date().toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" }).replace(",", "");
+  return `<div class="mb-preview" data-level="${level(highest)}" aria-label="Menu bar preview">${entries}<span class="clock">${esc(clock)}</span></div>`;
+}
+
+function menuBarPanel() {
+  const mb = state.settings.menubar, chosen = new Set(mb.items), full = chosen.size >= mb.max;
+  const toggles = MENU_BAR_ITEMS.map(([src, win, name]) => {
+    const key = `${src}:${win}`, on = chosen.has(key);
+    return `<button class="mb-item" aria-pressed="${on}" data-mb-item="${key}" ${!on && full ? `disabled title="Up to ${mb.max} items"` : ""}>${glyph(src)}${SOURCE_LABEL[src]} ${name.toLowerCase()}</button>`;
+  }).join("");
+  return `<div class="panel">
+    <div class="panel-head"><div class="panel-title">${icon("gauge")}Menu bar</div>${mb.customized ? `<button class="link-btn" data-mb-reset>Reset to default</button>` : ""}</div>
+    <div class="panel-body">
+      <div class="mb-grid">
+        <div>
+          <div class="mb-k">Show up to ${mb.max}</div>
+          <div class="mb-items">${toggles}</div>
+        </div>
+        <div>
+          <div class="mb-k">Display</div>
+          <div class="mb-opts">
+            <div class="seg compact" role="group" aria-label="Show usage as">
+              <button data-mb-value="used" aria-pressed="${mb.value !== "left"}">Used</button><button data-mb-value="left" aria-pressed="${mb.value === "left"}">Left</button>
+            </div>
+            <label class="check"><input type="checkbox" data-mb-time ${mb.reset ? "checked" : ""}>Time until reset</label>
+          </div>
+          <div class="mb-k" style="margin-top:16px">Preview</div>
+          ${menuBarPreview(mb)}
+        </div>
+      </div>
+      <p class="settings-note" style="margin-top:14px">The ${glyph("claude")} and ${glyph("codex")} icons tell Claude and Codex apart. It turns orange at 75% used and red at 90%, whether you show used or left. If you pay per token and no plan limits are reported, it shows your budgets instead.</p>
+    </div>
+  </div>`;
+}
+
+function saveMenuBar(change) {
+  const mb = { ...state.settings.menubar, ...change };
+  if (!mb.items.length) { state.settingsError = "Keep at least one item in the menu bar."; render(); return; }
+  saveSettings("/api/app/menubar", { items: mb.items.join(","), value: mb.value, time: mb.reset ? "1" : "0" }, "Menu bar updated");
+}
+
 /* Destructive buttons ask once more: the first click changes the label, the
    second within three seconds acts. Kept in state, not on the button, so a
    background re-render between the clicks doesn't forget the first. */
@@ -1819,7 +1912,7 @@ views.settings = () => {
   if (!state.settings) {
     return viewHead("Settings", sub) + `<div class="panel"><div class="empty-state">${state.settingsError ? "" : `Loading<span class="loading-dots"></span>`}</div></div>`;
   }
-  return viewHead("Settings", sub) + budgetsPanel() + pricesPanel() + groupsPanel();
+  return viewHead("Settings", sub) + budgetsPanel() + menuBarPanel() + pricesPanel() + groupsPanel();
 };
 
 // Bumped by every save: a response to a request sent before the latest save
@@ -1866,6 +1959,7 @@ async function sendSettings(path, params, done, rev) {
     if (rev !== settingsRev) return;
     state.settings = settings;
     state.saveState = done;
+    render();
     await refresh();
   } catch (e) {
     if (rev !== settingsRev) return;
@@ -1902,6 +1996,7 @@ document.addEventListener("change", e => {
   const t = e.target;
   if (t.dataset.price) savePriceRow(t.dataset.price);
   else if (t.dataset.budget) saveBudgets(t.dataset.budget);
+  else if (t.matches("[data-mb-time]")) saveMenuBar({ reset: t.checked });
   else if (t.dataset.groupRename) {
     const name = t.value.trim();
     if (!name) { state.settingsError = "A group needs a name."; render(); return; }
@@ -2056,6 +2151,21 @@ document.addEventListener("click", e => {
   if (resetAll) {
     if (!confirmTwice("prices:" + state.settingsSource)) return;
     saveSettings("/api/app/prices/reset", { source: state.settingsSource }, `${SOURCE_LABEL[state.settingsSource]} prices reset to built-in`);
+    return;
+  }
+  const mbItem = t.closest("[data-mb-item]");
+  if (mbItem) {
+    const key = mbItem.dataset.mbItem, items = state.settings.menubar.items;
+    saveMenuBar({ items: items.includes(key) ? items.filter(k => k !== key) : [...items, key] });
+    return;
+  }
+  const mbValue = t.closest("[data-mb-value]");
+  if (mbValue) {
+    if (mbValue.dataset.mbValue !== state.settings.menubar.value) saveMenuBar({ value: mbValue.dataset.mbValue });
+    return;
+  }
+  if (t.closest("[data-mb-reset]")) {
+    saveSettings("/api/app/menubar", { reset: "default" }, "Menu bar back to the default");
     return;
   }
   const groupMore = t.closest("[data-group-more]");
