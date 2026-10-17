@@ -14,7 +14,7 @@ They open it to answer two questions, with equal weight:
 1. **Am I near my limits?** Current 5-hour and weekly usage %, when each resets, and whether the current pace will exhaust the weekly quota before the reset. For per-token users, the limits are their own daily, weekly or monthly dollar budgets.
 2. **What did it cost?** The API-equivalent dollar value of their usage for a chosen period, and how it trends.
 
-Drilling into sessions, projects and models is a secondary, investigative job. Settings (editing per-model prices, setting budgets) is occasional upkeep.
+Drilling into sessions, projects and models is a secondary, investigative job. Settings (budgets, per-model prices, model groups) is occasional upkeep.
 
 ## Product Purpose
 
@@ -40,6 +40,7 @@ Everything runs on the user's machine from logs the CLIs already write: no accou
 - Dollar values are hypothetical for subscription users and must be labeled as API-equivalent estimates.
 - Prices are the built-in tables (`macpapp/Resources/pricing_*.json`) with the user's own per-model edits layered on top; an edit reprices all stored usage, and Reset always restores the built-in price. User settings live in the local database and survive app updates.
 - Budgets use the same allowance language as plan limits: a meter per calendar day, week (from Monday) or month, amber at 75%, red at 90%.
+- Model groups overlap by design (a model can be in several), so group costs are shown as each group's share of the total, never as slices of a stacked bar. Built-in groups (Anthropic, OpenAI, model families) match by rule so new models join them; user edits add or exclude models on top, and reset restores the built-ins.
 
 ## Evidence on Hand
 

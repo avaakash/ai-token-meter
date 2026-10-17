@@ -35,7 +35,7 @@ extension UsageStore {
 
     /// Saves the settings, reloads both price tables and reprices every
     /// stored message if a price changed.
-    private func apply(_ settings: [String: Any]) throws {
+    func apply(_ settings: [String: Any]) throws {
         let data = try JSONSerialization.data(withJSONObject: settings, options: [.sortedKeys])
         let previous = sources.map(\.pricing)
         let updated = try sources.map { try Self.loadPricing(paths, $0.name, settings) }
@@ -193,7 +193,7 @@ extension UsageStore {
             for period in Self.budgetPeriods { spent[period] = try periodSpend(source.name, period, now: Date())?.cost }
             budgets[source.name] = ["amounts": try budgetAmounts(source.name), "spent": spent]
         }
-        return ["prices": try priceList(sourceName), "budgets": budgets]
+        return ["prices": try priceList(sourceName), "budgets": budgets, "groups": try groupsPayload()]
     }
 }
 

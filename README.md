@@ -40,12 +40,12 @@ Everything stays on your Mac. 🔒 No account, no telemetry, no server.
 |---|---|
 | 📊 **Limits in the menu bar** | `5h 41% · W 63%`, always visible. It turns orange at 75% and red at 90%, so you see the wall before you hit it. Click it for both sources and their reset times. |
 | 🔮 **Run-out forecast** | "On pace to finish the week near 94%." Projected from the shape of your own past weeks, with a range, not a straight line. |
-| 💸 **API-equivalent cost** | What your usage would cost per token, for any period from 1 day to 1 year, split between Claude and Codex and broken down by model. |
+| 💸 **API-equivalent cost** | What your usage would cost per token, for any period from 1 day to 1 year, split between Claude and Codex and broken down by model and by model group (Anthropic, OpenAI, Opus, Sonnet… or your own). |
 | 🧵 **Session transcripts** | Open any session to see each prompt you typed, what it cost, the tools the agent used, and a cost-per-turn chart. Click a bar to jump to its turn. |
 | 🏷️ **Real session names** | Uses the names from the Claude app and Codex, your renames first. No more staring at UUIDs. |
 | 🔥 **Activity** | A year-long heatmap, your streaks, and which hours of the week you burn the most tokens. |
 | 🗂️ **Projects and models** | Where the spend goes, per repo and per model. |
-| ⚙️ **Your prices, your budgets** | Edit any model's price or add new ones, and reset to the built-in list anytime. Billed per token? Set daily, weekly or monthly budgets and track them like plan limits. |
+| ⚙️ **Your prices, budgets and groups** | Edit any model's price or add new ones, and reset to the built-in list anytime. Billed per token? Set daily, weekly or monthly budgets and track them like plan limits. Group models however you like; a model can be in several groups. |
 | 🌗 **Feels like a Mac app** | Sidebar vibrancy, your accent colour, Light/Dark and Increase Contrast, all applied live. |
 
 <table>

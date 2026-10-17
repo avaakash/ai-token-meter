@@ -376,6 +376,32 @@
   .save-state { font-size: 12px; color: var(--ink-3); }
   .save-state.err { color: var(--crit-ink); }
   .nav-sep { height: 1px; background: var(--hair); margin: 10px 10px 6px; }
+  .group-row { padding: 12px 18px 14px; }
+  .group-row + .group-row { border-top: 1px solid var(--hair); }
+  .group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-bottom: 8px; }
+  .group-name {
+    font: inherit; font-size: 13.5px; font-weight: 650; color: var(--ink); background: transparent;
+    border: 0; border-radius: 6px; padding: 3px 6px; margin-left: -6px; width: 14em; max-width: 100%;
+  }
+  .group-name:hover { box-shadow: 0 0 0 1px var(--hair-strong); }
+  .group-name:focus { outline: 0; box-shadow: 0 0 0 2px var(--plan); background: var(--panel); }
+  .group-head .note { flex: 1; min-width: 0; }
+  .chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px; padding: 3px 3px 3px 8px; border-radius: 6px;
+    background: var(--panel-2); box-shadow: 0 0 0 1px var(--hair); font-size: 12px; color: var(--ink);
+  }
+  .chip .glyph { width: 13px; height: 13px; color: var(--ink-3); }
+  .chip-x { display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 4px; padding: 0; background: none; color: var(--ink-3); cursor: pointer; }
+  .chip-x:hover { background: var(--hair); color: var(--ink); }
+  .chip-x .icon { width: 12px; height: 12px; }
+  .add-select {
+    font: inherit; font-size: 12px; color: var(--ink-2); background: var(--panel); cursor: pointer;
+    border: 0; box-shadow: 0 0 0 1px var(--hair-strong); border-radius: 6px; padding: 4px 6px; max-width: 220px;
+  }
+  .link-btn.danger { color: var(--crit-ink); }
+  .link-btn.confirm { color: var(--crit-ink); font-weight: 650; }
+  .new-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; padding: 12px 18px; border-top: 1px solid var(--hair); }
 
   .sessions-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
   .back-link { border: 0; background: none; padding: 0; margin: 0 0 8px; cursor: pointer; color: var(--plan-ink); font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 2px; }
@@ -736,7 +762,7 @@ const state = {
   query: "", sort: { key: "end_ts", dir: -1 }, selected: null, limit: 40,
   data: null, sessions: null, error: null, loading: false,
   transcriptId: null, transcript: null, turnSort: "order", expanded: new Set(), showCarried: false,
-  settings: null, settingsSource: "claude", settingsError: null, saveState: "", showAllPrices: false,
+  settings: null, settingsSource: "claude", settingsError: null, saveState: "", showAllPrices: false, openGroups: new Set(),
 };
 if (!["all", "claude", "codex"].includes(state.source)) state.source = "all";
 if (!PERIODS.some(p => p[0] === state.period)) state.period = "7d";
@@ -800,6 +826,7 @@ function adaptDashboard(d) {
     period: withSessions(d.period),
     by_source: d.by_source.map(withSessions),
     by_model: d.by_model.filter(m => m.model !== "<synthetic>").map(withSessions),
+    by_group: d.by_group || [],
     by_project: d.by_project.map(withSessions),
     daily: d.daily,
     longest: d.longest_session ? normSession(d.longest_session) : null,
@@ -819,7 +846,11 @@ async function refresh() {
     if (state.view === "sessions" || state.sessions) {
       state.sessions = (await api(`/api/all-sessions?source=${state.source}`)).sessions.map(normSession);
     }
-    if (state.view === "settings") state.settings = await api(`/api/app/settings?source=${state.settingsSource}`);
+    if (state.view === "settings") {
+      const rev = settingsRev;
+      const settings = await api(`/api/app/settings?source=${state.settingsSource}`);
+      if (rev === settingsRev) state.settings = settings;
+    }
     state.error = null;
     retries = 0;
   } catch (e) {
@@ -1287,6 +1318,24 @@ function sourceCostPanel(st, total, days) {
   </div>`;
 }
 
+/* Groups overlap (a model can be in several), so each bar is that group's
+   share of the period total, not a slice of a stacked whole. */
+function groupCostPanel(total) {
+  const groups = state.data.by_group;
+  const rows = groups.map(g => `
+    <div class="list-row share-row" ${tipAttr(tipRows(g.name, [["Cost", usd(g.cost)], ["Share of total", pct(total ? g.cost / total * 100 : 0, 1)], ["Messages", int(g.message_count)], ["Models", g.models.join(", ")]]))}>
+      <div style="min-width:0"><div class="s-name">${esc(g.name)}</div><div class="share-meta">${g.models.length} ${g.models.length === 1 ? "model" : "models"} · ${int(g.message_count)} messages</div></div>
+      <div class="share-bar-cell"><div class="share-bar"><span data-w="${total ? g.cost / total * 100 : 0}%"></span></div></div>
+      <div style="text-align:right"><div class="s-cost">${usd(g.cost)}</div><div class="s-when">${pct(total ? g.cost / total * 100 : 0)} of total</div></div>
+    </div>`).join("");
+  return `<div class="panel">
+    <div class="panel-head"><div class="panel-title">By group</div><button class="link-btn" data-go="settings">Edit groups</button></div>
+    ${groups.length ? `<div class="rows" style="margin-top:6px">${rows}</div>
+      <p class="note" style="margin:0;padding:8px 18px 14px">A model can be in several groups, so groups overlap and don't add up to the total.</p>`
+      : `<div class="empty-state">No group has usage in this period.</div>`}
+  </div>`;
+}
+
 function emptyCost() {
   return `<div class="empty-state" style="padding:8px 0"><h3>No usage in this period</h3>Costs are worked out from the session logs Claude Code and Codex already write on this Mac. Nothing is uploaded.</div>`;
 }
@@ -1406,6 +1455,7 @@ views.cost = () => {
         <div class="panel-body" style="padding-top:2px">${capacityHTML(modelParts, total, "cost-models")}</div>
       </div>
     </div>
+    ${groupCostPanel(total)}
     ${state.source === "all" ? `<div class="grid g-2">${perSource.map(st => sourceCostPanel(st, total, days)).join("")}</div>` : ""}
     <div class="panel">
       <div class="panel-head"><div class="panel-title">Cost per ${series.unit}, by token type</div><div class="panel-aside">${esc(periodLabel())}</div></div>
@@ -1679,7 +1729,7 @@ function pricesPanel() {
     </div>
     <div class="panel-foot">
       <span class="note">${list.edited_count ? `${list.edited_count} edited ${list.edited_count === 1 ? "price" : "prices"}` : "Using the built-in prices"}</span>
-      <button class="btn" data-reset-prices ${list.edited_count ? "" : "disabled"}>Reset ${label} prices to built-in</button>
+      ${confirmButton("prices:" + src, "btn", `Reset ${label} prices to built-in`, "Click again to reset", `data-reset-prices ${list.edited_count ? "" : "disabled"}`)}
     </div>
   </div>`;
 }
@@ -1704,17 +1754,83 @@ function budgetsPanel() {
   </div>`;
 }
 
+function groupsPanel() {
+  const g = state.settings.groups;
+  const sourceOf = new Map(g.models.map(m => [m.model, m.source]));
+  const rows = g.list.map(gr => {
+    const members = new Set(gr.members.map(m => m.model));
+    // Models you've used come first; long built-in groups fold the rest.
+    const open = state.openGroups.has(gr.id);
+    const visible = open ? gr.members : gr.members.slice(0, 8);
+    const more = gr.members.length - visible.length;
+    const toggle = more > 0 ? `<button class="link-btn" data-group-more="${esc(gr.id)}">+${more} more</button>`
+      : open && gr.members.length > 8 ? `<button class="link-btn" data-group-more="${esc(gr.id)}">Show fewer</button>` : "";
+    const chips = visible.map(m => `<span class="chip">${glyph(m.source || sourceOf.get(m.model))}${esc(m.model)}<button class="chip-x" data-group-remove="${esc(gr.id)}" data-model="${esc(m.model)}" aria-label="Remove ${esc(m.model)} from ${esc(gr.name)}">${icon("close")}</button></span>`).join("");
+    const options = g.models.filter(m => !members.has(m.model))
+      .map(m => `<option value="${esc(m.model)}">${esc(m.model)}${m.used ? "" : " · not used yet"}</option>`).join("");
+    return `<div class="group-row">
+      <div class="group-head">
+        <input class="group-name" value="${esc(gr.name)}" maxlength="40" data-group-rename="${esc(gr.id)}" data-focus-key="group:${esc(gr.id)}" aria-label="Group name" spellcheck="false">
+        <span class="note">${gr.rule ? `${esc(gr.rule)}, including new ones · ` : ""}${gr.members.length} ${gr.members.length === 1 ? "model" : "models"}</span>
+        ${confirmButton("group:" + gr.id, "link-btn danger", "Delete", "Click again to delete", `data-group-delete="${esc(gr.id)}"`)}
+      </div>
+      <div class="chips">${chips || `<span class="note">No models yet.</span>`}${toggle}
+        ${options ? `<select class="add-select" data-group-add="${esc(gr.id)}" aria-label="Add a model to ${esc(gr.name)}"><option value="">Add a model…</option>${options}</select>` : ""}
+      </div>
+    </div>`;
+  }).join("");
+  return `<div class="panel">
+    <div class="panel-head"><div class="panel-title">${icon("chip")}Model groups</div></div>
+    <div class="panel-body" style="padding-bottom:4px"><p class="settings-note">Groups add up cost on the Cost page. A model can be in as many groups as you like. The built-in groups pick up new models by name, and you can add or remove any model from any group.</p></div>
+    <div class="rows">${rows || `<div class="empty-state">No groups. Create one below, or reset to the built-in groups.</div>`}</div>
+    <div class="new-group">
+      ${moneyInput("", `data-new-group data-focus-key="group:new" maxlength="40" aria-label="New group name"`, { cls: "name", prefix: "", placeholder: "New group, e.g. Daily drivers" })}
+      <button class="btn" data-group-create>Create group</button>
+    </div>
+    <div class="panel-foot">
+      <span class="note">${g.customized ? "Your own groups" : "Using the built-in groups"}</span>
+      ${confirmButton("groups", "btn", "Reset to built-in groups", "Click again to reset", `data-reset-groups ${g.customized ? "" : "disabled"}`)}
+    </div>
+  </div>`;
+}
+
+/* Destructive buttons ask once more: the first click changes the label, the
+   second within three seconds acts. Kept in state, not on the button, so a
+   background re-render between the clicks doesn't forget the first. */
+let confirming = null;
+function confirmTwice(key) {
+  if (confirming?.key === key && Date.now() < confirming.until) { confirming = null; return true; }
+  confirming = { key, until: Date.now() + 3000 };
+  render();
+  setTimeout(() => { if (confirming?.key === key && Date.now() >= confirming.until) { confirming = null; render(); } }, 3050);
+  return false;
+}
+function confirmButton(key, cls, label, confirmLabel, attrs = "") {
+  const on = confirming?.key === key && Date.now() < confirming.until;
+  return `<button class="${cls}${on ? " confirm" : ""}" ${attrs}>${on ? confirmLabel : label}</button>`;
+}
+
+function saveGroups(params, done) {
+  saveSettings("/api/app/groups", params, done);
+}
+
 views.settings = () => {
   const sub = `<span class="save-state ${state.settingsError ? "err" : ""}">${esc(state.settingsError || state.saveState || "Stored on this Mac, kept across updates")}</span>`;
   if (!state.settings) {
     return viewHead("Settings", sub) + `<div class="panel"><div class="empty-state">${state.settingsError ? "" : `Loading<span class="loading-dots"></span>`}</div></div>`;
   }
-  return viewHead("Settings", sub) + pricesPanel() + budgetsPanel();
+  return viewHead("Settings", sub) + budgetsPanel() + pricesPanel() + groupsPanel();
 };
 
+// Bumped by every save: a response to a request sent before the latest save
+// carries older settings and must not overwrite newer ones.
+let settingsRev = 0;
+
 async function loadSettings() {
+  const rev = ++settingsRev;
   try {
-    state.settings = await api(`/api/app/settings?source=${state.settingsSource}`);
+    const settings = await api(`/api/app/settings?source=${state.settingsSource}`);
+    if (rev === settingsRev) state.settings = settings;
     state.settingsError = null;
   } catch (e) {
     state.settingsError = String(e.message || e);
@@ -1731,16 +1847,28 @@ function parseMoney(input) {
   return ok ? { value } : { invalid: true };
 }
 
-async function saveSettings(path, params, done) {
+// Saves go out one at a time: the backend answers requests on several
+// threads, so two sent together could reach the database in either order.
+let saveQueue = Promise.resolve();
+function saveSettings(path, params, done) {
+  const rev = ++settingsRev;
   state.saveState = "Saving…";
   state.settingsError = null;
   render();
+  saveQueue = saveQueue.then(() => sendSettings(path, params, done, rev));
+  return saveQueue;
+}
+
+async function sendSettings(path, params, done, rev) {
   try {
     const query = new URLSearchParams({ ...params, view: state.settingsSource });
-    state.settings = await api(`${path}?${query}`, { method: "POST" });
+    const settings = await api(`${path}?${query}`, { method: "POST" });
+    if (rev !== settingsRev) return;
+    state.settings = settings;
     state.saveState = done;
     await refresh();
   } catch (e) {
+    if (rev !== settingsRev) return;
     state.settingsError = String(e.message || e);
     state.saveState = "";
     render();
@@ -1774,9 +1902,18 @@ document.addEventListener("change", e => {
   const t = e.target;
   if (t.dataset.price) savePriceRow(t.dataset.price);
   else if (t.dataset.budget) saveBudgets(t.dataset.budget);
+  else if (t.dataset.groupRename) {
+    const name = t.value.trim();
+    if (!name) { state.settingsError = "A group needs a name."; render(); return; }
+    saveGroups({ action: "rename", id: t.dataset.groupRename, name }, `Renamed to ${name}`);
+  } else if (t.dataset.groupAdd && t.value) {
+    saveGroups({ action: "add", id: t.dataset.groupAdd, model: t.value }, `Added ${t.value}`);
+  }
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Enter" && e.target.closest?.("[data-add]")) $("[data-add-price]")?.click();
+  if (e.key === "Enter" && e.target.matches?.("[data-new-group]")) $("[data-group-create]")?.click();
+  if (e.key === "Enter" && e.target.matches?.("[data-group-rename]")) e.target.blur();
 });
 
 /* ===================== Shell ===================== */
@@ -1917,14 +2054,37 @@ document.addEventListener("click", e => {
   }
   const resetAll = t.closest("[data-reset-prices]");
   if (resetAll) {
-    // Two clicks, since this throws away every edited price for the source.
-    if (!resetAll.classList.contains("confirm")) {
-      resetAll.classList.add("confirm");
-      resetAll.textContent = "Click again to reset";
-      setTimeout(() => { if (resetAll.isConnected) render(); }, 3000);
-      return;
-    }
+    if (!confirmTwice("prices:" + state.settingsSource)) return;
     saveSettings("/api/app/prices/reset", { source: state.settingsSource }, `${SOURCE_LABEL[state.settingsSource]} prices reset to built-in`);
+    return;
+  }
+  const groupMore = t.closest("[data-group-more]");
+  if (groupMore) {
+    const id = groupMore.dataset.groupMore;
+    if (state.openGroups.has(id)) state.openGroups.delete(id); else state.openGroups.add(id);
+    render(); return;
+  }
+  const groupRemove = t.closest("[data-group-remove]");
+  if (groupRemove) {
+    saveGroups({ action: "remove", id: groupRemove.dataset.groupRemove, model: groupRemove.dataset.model }, `Removed ${groupRemove.dataset.model}`);
+    return;
+  }
+  const groupDelete = t.closest("[data-group-delete]");
+  if (groupDelete) {
+    if (!confirmTwice("group:" + groupDelete.dataset.groupDelete)) return;
+    saveGroups({ action: "delete", id: groupDelete.dataset.groupDelete }, "Group deleted");
+    return;
+  }
+  if (t.closest("[data-group-create]")) {
+    const name = $("[data-new-group]").value.trim();
+    if (!name) { state.settingsError = "Give the new group a name."; render(); return; }
+    saveGroups({ action: "create", name }, `Created ${name}`);
+    return;
+  }
+  const resetGroups = t.closest("[data-reset-groups]");
+  if (resetGroups) {
+    if (!confirmTwice("groups")) return;
+    saveGroups({ action: "reset" }, "Back to the built-in groups");
     return;
   }
   const clearBudgets = t.closest("[data-clear-budgets]");

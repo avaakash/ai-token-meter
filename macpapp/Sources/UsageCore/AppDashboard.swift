@@ -134,6 +134,7 @@ extension UsageStore {
             "period": period,
             "by_source": bySource,
             "by_model": byModel,
+            "by_group": try groupTotals(byModel),
             "by_project": byProject,
             "daily": daily,
             "longest_session": longest,

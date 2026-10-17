@@ -68,6 +68,12 @@ public final class Router {
                     try self.store.sync { try self.store.resetPrices(source) }
                     return try self.store.sync { try self.store.settingsPayload(source ?? "claude") }
                 }
+            case "/api/app/groups":
+                guard let action = qs["action"] else { return error(400, "missing action") }
+                return validated {
+                    try self.store.sync { try self.store.editGroups(action: action, id: qs["id"], name: qs["name"], model: qs["model"]) }
+                    return try self.store.sync { try self.store.settingsPayload(qs["view"].flatMap { sources.contains($0) ? $0 : nil } ?? "claude") }
+                }
             case "/api/app/budgets":
                 guard let source = qs["source"], sources.contains(source) else { return error(400, unknown) }
                 return validated {

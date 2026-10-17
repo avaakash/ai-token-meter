@@ -444,13 +444,13 @@
           <div class="group">Summary</div>
           <button role="tab" aria-selected="true" data-view="overview"><svg class="icon"><use href="#i-overview"/></svg><b>Overview</b><p>Both questions on one screen: how much of each limit is left, and what the period cost.</p></button>
           <button role="tab" aria-selected="false" data-view="limits"><svg class="icon"><use href="#i-gauge"/></svg><b>Limits</b><p>Live 5-hour and weekly windows for Claude and Codex, what each window cost, and where the week is headed.</p></button>
-          <button role="tab" aria-selected="false" data-view="cost"><svg class="icon"><use href="#i-cost"/></svg><b>Cost</b><p>Any period from a day to a year, split by Claude and Codex, by model and by token type.</p></button>
+          <button role="tab" aria-selected="false" data-view="cost"><svg class="icon"><use href="#i-cost"/></svg><b>Cost</b><p>Any period from a day to a year, split by Claude and Codex, by model, by model group and by token type.</p></button>
           <div class="group">Breakdown</div>
           <button role="tab" aria-selected="false" data-view="sessions"><svg class="icon"><use href="#i-sessions"/></svg><b>Sessions</b><p>Every session under its real name, searchable by name, project, path or ID.</p></button>
           <button role="tab" aria-selected="false" data-view="session"><svg class="icon"><use href="#i-turns"/></svg><b>One session</b><p>Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.</p></button>
           <button role="tab" aria-selected="false" data-view="projects"><svg class="icon"><use href="#i-folder"/></svg><b>Projects</b><p>Where the spend goes, repo by repo.</p></button>
           <button role="tab" aria-selected="false" data-view="models"><svg class="icon"><use href="#i-chip"/></svg><b>Models</b><p>Which models you lean on, and what each one costs.</p></button>
-          <button role="tab" aria-selected="false" data-view="settings"><svg class="icon"><use href="#i-sliders"/></svg><b>Settings</b><p>Your own price for any model, with a reset to the built-in list, and budgets if you pay per token.</p></button>
+          <button role="tab" aria-selected="false" data-view="settings"><svg class="icon"><use href="#i-sliders"/></svg><b>Settings</b><p>Budgets if you pay per token, your own price for any model with a reset to the built-in list, and model groups.</p></button>
         </div>
         <div role="tabpanel" aria-label="Dashboard screenshot">
           <p class="shot-desc" id="shot-desc"></p>
@@ -504,7 +504,7 @@
         <li><h3>The limits are the real ones.</h3><p>The percentages come from the providers. Claude's are read with the login Claude Code already keeps in your Keychain, and Codex's from <code>codex app-server</code>. Both refresh every 10 minutes, or when you click Sync Now. These two checks are the only network calls the app makes.</p></li>
         <li><h3>Forecasts come from your own weeks.</h3><p>"On pace to finish the week near 78%" is projected from the shape of your past weeks, with a range, not a straight line from Monday. Estimates are always labeled as estimates.</p></li>
         <li><h3>The dollars are hypothetical.</h3><p>On a Claude Pro or Max plan, or ChatGPT Plus or Pro, nobody bills you per token. Token Meter shows what the same tokens would cost on the API, which is either reassuring or alarming.</p></li>
-        <li><h3>Your prices, your budgets.</h3><p>Change any model's price in Settings, or add one the built-in list doesn't have, and every past message is repriced. Paying per token? Set daily, weekly or monthly budgets and watch them like plan limits. One click puts the built-in prices back.</p></li>
+        <li><h3>Your prices, your budgets.</h3><p>Change any model's price in Settings, or add one the built-in list doesn't have, and every past message is repriced. Paying per token? Set daily, weekly or monthly budgets and watch them like plan limits. Group models (Anthropic, Opus, your own picks) to see cost by group. One click puts the built-in prices back.</p></li>
         <li><h3>Small and native.</h3><p>A universal Swift app of about 2 MB. No account, no analytics, no Electron, no background server.</p></li>
       </ul>
     </div>
@@ -702,12 +702,12 @@
   const views = {
     overview: "Both questions on one screen: how much of each limit is left, and what the period cost.",
     limits: "Live 5-hour and weekly windows for Claude and Codex, what each window cost, and where the week is headed.",
-    cost: "Any period from a day to a year, split by Claude and Codex, by model and by token type.",
+    cost: "Any period from a day to a year, split by Claude and Codex, by model, by model group and by token type.",
     sessions: "Every session under its real name, searchable by name, project, path or ID.",
     session: "Each prompt you typed, what it cost, the tools the agent ran, and a cost-per-turn chart.",
     projects: "Where the spend goes, repo by repo.",
     models: "Which models you lean on, and what each one costs.",
-    settings: "Your own price for any model, with a reset to the built-in list, and budgets if you pay per token.",
+    settings: "Budgets if you pay per token, your own price for any model with a reset to the built-in list, and model groups.",
   };
   const alts = {
     overview: "The Overview: Claude and Codex limits, the API-equivalent cost split by source and model, and recent sessions",

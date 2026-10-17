@@ -91,6 +91,11 @@ withTempStore { store, _ in
           "dated claude snapshot inherits cache discount")
     let sonnet5 = claude.pricing.resolveRate(model: "claude-sonnet-5-20260901", timestamp: ts)
     check(sonnet5.input == 2 && sonnet5.output == 10, "older model isn't captured by a longer name")
+    let opus4 = claude.pricing.resolveRate(model: "claude-opus-4-20250514", timestamp: ts)
+    check(opus4.input == 15 && opus4.output == 75, "dated opus 4 snapshot isn't priced by the opus fallback")
+    let opus41 = claude.pricing.resolveRate(model: "claude-opus-4-1-20250805", timestamp: ts)
+    let opus45 = claude.pricing.resolveRate(model: "claude-opus-4-5-20251101", timestamp: ts)
+    check(opus41.input == 15 && opus45.input == 5, "opus 4.x snapshots aren't captured by claude-opus-4")
 
     for (model, cached) in [("claude-fable-5-1", 0.25), ("claude-opus-5-5", 0.2), ("claude-sonnet-5-5", 0.1),
                             ("claude-opus-4-8", 0.5)] {
@@ -379,6 +384,60 @@ withTempStore { store, home in
     let codexAmounts = ((body?["budgets"] as? [String: Any])?["codex"] as? [String: Any])?["amounts"] as? [String: Double]
     check(saveBudget.status == 200 && codexAmounts == ["week": 50], "the budgets route saves and returns settings")
     check(router.handle(method: "GET", path: "/api/app/settings", query: "source=codex").status == 200, "settings route")
+}
+
+// MARK: Model groups
+
+withTempStore { store, home in
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    let stamp = formatter.string(from: Date())
+    func message(_ id: String, _ model: String) -> [String: Any] {
+        ["type": "assistant", "timestamp": stamp, "cwd": "/repo", "sessionId": "s1",
+         "message": ["id": id, "model": model, "usage": ["input_tokens": 1_000_000, "output_tokens": 0]]]
+    }
+    try writeLines(home + "/.claude/projects/-repo/s.jsonl", [message("a", "claude-opus-5-5"), message("b", "claude-sonnet-5-5")])
+    try store.sync { try store.scanAll() }
+    func groups() throws -> [[String: Any]] { try store.sync { try store.buildAppDashboard("all", days: 7) }["by_group"] as? [[String: Any]] ?? [] }
+    func group(_ id: String) throws -> [String: Any]? { try groups().first { $0["id"] as? String == id } }
+    func members(_ id: String) throws -> [String] {
+        let list = try store.sync { try store.groupsPayload() }["list"] as? [[String: Any]] ?? []
+        return (list.first { $0["id"] as? String == id }?["members"] as? [[String: Any]] ?? []).compactMap { $0["model"] as? String }
+    }
+    let total = try store.db.queryOne("SELECT SUM(cost) AS c FROM messages")?.double("c") ?? 0
+
+    check(try store.sync { try store.modelGroups() }.map(\.id).prefix(3) == ["anthropic", "openai", "opus"], "built-in groups come first")
+    check(close(try group("anthropic")?["cost"] as? Double, total), "Anthropic adds up every Claude model")
+    check(try group("opus")?["models"] as? [String] == ["claude-opus-5-5"] && group("openai") == nil,
+          "family groups match by name; groups without usage are left out")
+    check(try members("opus").contains("claude-opus-4-8"), "built-in groups list unused models from the price table")
+
+    try store.sync { try store.editGroups(action: "create", id: nil, name: "Daily drivers", model: nil) }
+    let mine = try store.sync { try store.modelGroups() }.last!
+    check(mine.name == "Daily drivers" && mine.models.isEmpty, "create adds an empty group")
+    try store.sync { try store.editGroups(action: "add", id: mine.id, name: nil, model: "claude-sonnet-5-5") }
+    try store.sync { try store.editGroups(action: "add", id: mine.id, name: nil, model: "claude-opus-5-5") }
+    check(close(try group(mine.id)?["cost"] as? Double, total), "a model can be in several groups")
+
+    try store.sync { try store.editGroups(action: "remove", id: "opus", name: nil, model: "claude-opus-5-5") }
+    check(try group("opus") == nil && !members("opus").contains("claude-opus-5-5"), "removing a rule-matched model excludes it")
+    try store.sync { try store.editGroups(action: "add", id: "opus", name: nil, model: "claude-opus-5-5") }
+    check(try group("opus") != nil, "adding it back undoes the exclusion")
+
+    check((try? store.sync { try store.editGroups(action: "rename", id: mine.id, name: "opus", model: nil) }) == nil,
+          "group names are unique, ignoring case")
+    try store.sync { try store.editGroups(action: "rename", id: mine.id, name: "Favourites", model: nil) }
+    check(try store.sync { try store.modelGroups() }.contains { $0.name == "Favourites" }, "rename")
+    try store.sync { try store.editGroups(action: "delete", id: "sonnet", name: nil, model: nil) }
+    check(try !store.sync { try store.modelGroups() }.contains { $0.id == "sonnet" }, "a built-in group can be deleted")
+    try store.sync { try store.editGroups(action: "reset", id: nil, name: nil, model: nil) }
+    check(try store.sync { try store.modelGroups() }.map(\.id) == ModelGroup.defaults.map(\.id)
+          && UsageStore.readSettings(store.db)["groups"] == nil, "reset restores the built-in groups")
+
+    let router = Router(store: store, webRoot: repoRoot + "/macpapp/Resources/web")
+    check(router.handle(method: "POST", path: "/api/app/groups", query: "action=create&name=").status == 400, "an empty group name is a 400")
+    check(router.handle(method: "POST", path: "/api/app/groups", query: "action=add&id=nope&model=x").status == 400, "an unknown group is a 400")
+    check(router.handle(method: "POST", path: "/api/app/groups", query: "action=create&name=Team").status == 200, "groups route")
 }
 
 print("\(checks - failures)/\(checks) checks passed")
